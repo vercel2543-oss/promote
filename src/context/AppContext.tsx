@@ -1,0 +1,660 @@
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import {
+  User,
+  CommitteeGroup,
+  FormTemplate,
+  GradeThreshold,
+  EvaluationSubmission,
+  AggregatedResult,
+  AuditLog,
+  SystemSettings,
+} from '../types';
+import {
+  INITIAL_USERS,
+  INITIAL_COMMITTEE_GROUPS,
+  GRADE_THRESHOLDS,
+  INITIAL_SUBMISSIONS,
+} from '../data/initialData';
+import { FORM_TEMPLATES } from '../data/formTemplates';
+import { calculateAggregatedResult } from '../utils/evaluationCalculator';
+import { CHAINAT_SCHOOL_LOGO } from '../data/presetLogos';
+
+export type ViewType =
+  | 'dashboard'
+  | 'evaluate'
+  | 'groups'
+  | 'reports'
+  | 'templates'
+  | 'users'
+  | 'forms_admin'
+  | 'my_evaluation'
+  | 'schema'
+  | 'settings';
+
+export const DEFAULT_SETTINGS: SystemSettings = {
+  appName: 'ระบบประเมินผลการปฏิบัติงานลูกจ้างชั่วคราวและจ้างเหมาบริการ',
+  appShortName: 'PES v3.0',
+  schoolName: 'โรงเรียนศึกษาพิเศษชัยนาท',
+  schoolAffiliation: 'สำนักบริหารงานการศึกษาพิเศษ สำนักงานคณะกรรมการการศึกษาขั้นพื้นฐาน',
+  logoUrl: CHAINAT_SCHOOL_LOGO,
+  isDemoMode: true,
+  academicYear: '2569',
+  evaluationRound: 'การประเมินผลการปฏิบัติงาน ปีงบประมาณ 2569 (คำสั่งที่ 251/2569 และ 252/2569)',
+};
+
+interface AppContextType {
+  // Auth
+  currentUser: User;
+  setCurrentUser: (user: User) => void;
+  isAuthenticated: boolean;
+  login: (username: string, password: string) => { success: boolean; message?: string };
+  loginAsUser: (user: User) => void;
+  logout: () => void;
+
+  // System Settings
+  systemSettings: SystemSettings;
+  updateSystemSettings: (settings: Partial<SystemSettings>) => void;
+  resetSystemSettings: () => void;
+
+  // Data
+  users: User[];
+  committeeGroups: CommitteeGroup[];
+  formTemplates: FormTemplate[];
+  gradeThresholds: GradeThreshold[];
+  submissions: EvaluationSubmission[];
+  auditLogs: AuditLog[];
+  aggregatedResults: AggregatedResult[];
+  
+  // Navigation / Active Context
+  activeView: ViewType;
+  setActiveView: (view: ViewType) => void;
+  selectedFormId: string;
+  setSelectedFormId: (id: string) => void;
+  selectedEvaluateeId: string;
+  setSelectedEvaluateeId: (id: string) => void;
+  
+  // Evaluations & Scoring Management
+  submitEvaluation: (submission: Omit<EvaluationSubmission, 'id' | 'submittedAt'>) => Promise<EvaluationSubmission>;
+  saveDraftEvaluation: (submission: Omit<EvaluationSubmission, 'id' | 'submittedAt'>) => void;
+  getDraftEvaluation: (evaluateeId: string, formId: string) => EvaluationSubmission | null;
+  clearDraftEvaluation: (evaluateeId: string, formId: string) => void;
+  deleteSubmission: (submissionId: string) => void;
+  deleteEvaluationByEvaluator: (evaluateeId: string, evaluatorId: string) => void;
+  updateSubmission: (submission: EvaluationSubmission) => void;
+  adminUpsertSubmission: (submission: Omit<EvaluationSubmission, 'id' | 'submittedAt'> & { id?: string }) => EvaluationSubmission;
+
+  // Committee Group CRUD
+  updateCommitteeGroup: (group: CommitteeGroup) => void;
+  addCommitteeGroup: (group: Omit<CommitteeGroup, 'id' | 'createdAt'>) => void;
+  deleteCommitteeGroup: (groupId: string) => void;
+
+  // User Management CRUD & Committee Profile
+  addUser: (userData: Omit<User, 'id'>) => User;
+  updateUser: (user: User) => void;
+  updateUserProfile: (userId: string, updates: Partial<User>) => void;
+  deleteUser: (userId: string) => void;
+  resetUserPassword: (userId: string, newPassword: string) => void;
+
+  // Form Management CRUD
+  updateFormTemplate: (form: FormTemplate) => void;
+  addFormTemplate: (form: Omit<FormTemplate, 'id'>) => FormTemplate;
+  deleteFormTemplate: (formId: string) => void;
+  resetFormTemplatesToDefault: () => void;
+
+  // Global Settings
+  updateGradeThresholds: (thresholds: GradeThreshold[]) => void;
+  resetAllDataToDefault: () => void;
+}
+
+const AppContext = createContext<AppContextType | undefined>(undefined);
+
+const STORAGE_KEYS = {
+  CURRENT_USER: 'pes_current_user_v8',
+  IS_AUTH: 'pes_is_auth_v8',
+  USERS: 'pes_users_v8',
+  GROUPS: 'pes_groups_v8',
+  TEMPLATES: 'pes_templates_v8',
+  SUBMISSIONS: 'pes_submissions_v8',
+  THRESHOLDS: 'pes_thresholds_v8',
+  AUDIT_LOGS: 'pes_audit_logs_v8',
+  SETTINGS: 'pes_settings_v8',
+};
+
+export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // 1. Users state
+  const [users, setUsers] = useState<User[]>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.USERS);
+    return saved ? JSON.parse(saved) : INITIAL_USERS;
+  });
+
+  // 1.1 System Settings state
+  const [systemSettings, setSystemSettings] = useState<SystemSettings>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.SETTINGS);
+    if (saved) {
+      try {
+        return { ...DEFAULT_SETTINGS, ...JSON.parse(saved) };
+      } catch (e) {
+        // fallback
+      }
+    }
+    return DEFAULT_SETTINGS;
+  });
+
+  // 2. Auth state
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.IS_AUTH);
+    return saved ? JSON.parse(saved) : true; // Default true for instant preview, can be toggled/logged out
+  });
+
+  const [currentUser, setCurrentUser] = useState<User>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        // fallback
+      }
+    }
+    // Default to Evaluator 1 (นางสาวอรวรรณ พงษ์ศิริ - ประธานกรรมการ ชุดที่ 1)
+    return INITIAL_USERS[1];
+  });
+
+  // 3. Committee Groups
+  const [committeeGroups, setCommitteeGroups] = useState<CommitteeGroup[]>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.GROUPS);
+    return saved ? JSON.parse(saved) : INITIAL_COMMITTEE_GROUPS;
+  });
+
+  // 4. Form Templates
+  const [formTemplates, setFormTemplates] = useState<FormTemplate[]>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.TEMPLATES);
+    return saved ? JSON.parse(saved) : FORM_TEMPLATES;
+  });
+
+  // 5. Submissions
+  const [submissions, setSubmissions] = useState<EvaluationSubmission[]>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.SUBMISSIONS);
+    return saved ? JSON.parse(saved) : INITIAL_SUBMISSIONS;
+  });
+
+  // 6. Grade Thresholds
+  const [gradeThresholds, setGradeThresholds] = useState<GradeThreshold[]>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.THRESHOLDS);
+    return saved ? JSON.parse(saved) : GRADE_THRESHOLDS;
+  });
+
+  // 7. Audit Logs
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.AUDIT_LOGS);
+    return saved
+      ? JSON.parse(saved)
+      : [
+          {
+            id: 'log_init',
+            timestamp: new Date().toISOString(),
+            userId: 'user_admin_1',
+            userName: 'นายปรัชญา สมณะช้างเผือก',
+            action: 'INITIALIZE_SYSTEM',
+            details: 'คำสั่งโรงเรียนศึกษาพิเศษชัยนาท ที่ 251/2569 แต่งตั้งคณะกรรมการประเมินผลการปฏิบัติงาน ปีงบประมาณ 2569 ตำแหน่ง ครูผู้ช่วย (ลูกจ้างชั่วคราว)',
+          },
+        ];
+  });
+
+  // Active View & Filters
+  const [activeView, setActiveView] = useState<ViewType>('dashboard');
+  const [selectedFormId, setSelectedFormId] = useState<string>('form_teacher_assistant');
+  const [selectedEvaluateeId, setSelectedEvaluateeId] = useState<string>('staff_1');
+
+  // Persistence Sync
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(currentUser));
+  }, [currentUser]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.IS_AUTH, JSON.stringify(isAuthenticated));
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+  }, [users]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.GROUPS, JSON.stringify(committeeGroups));
+  }, [committeeGroups]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.TEMPLATES, JSON.stringify(formTemplates));
+  }, [formTemplates]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.SUBMISSIONS, JSON.stringify(submissions));
+  }, [submissions]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.THRESHOLDS, JSON.stringify(gradeThresholds));
+  }, [gradeThresholds]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.AUDIT_LOGS, JSON.stringify(auditLogs));
+  }, [auditLogs]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(systemSettings));
+  }, [systemSettings]);
+
+  // Compute Aggregated Results for all Evaluatees
+  const [aggregatedResults, setAggregatedResults] = useState<AggregatedResult[]>([]);
+
+  useEffect(() => {
+    const results: AggregatedResult[] = [];
+    const evaluateeUsers = users.filter((u) => u.role === 'staff');
+
+    evaluateeUsers.forEach((evaluatee) => {
+      // Find matching committee group
+      const assignedGroup =
+        committeeGroups.find((g) => g.assignedEvaluateeIds.includes(evaluatee.id)) ||
+        committeeGroups[0];
+
+      // Find matching form template
+      const matchingForm =
+        formTemplates.find(
+          (t) =>
+            evaluatee.position.includes(t.positionTitle) ||
+            t.positionTitle.includes(evaluatee.position)
+        ) || formTemplates[0];
+
+      const agg = calculateAggregatedResult(
+        evaluatee,
+        matchingForm,
+        assignedGroup,
+        submissions,
+        gradeThresholds
+      );
+
+      results.push(agg);
+    });
+
+    setAggregatedResults(results);
+  }, [users, committeeGroups, formTemplates, submissions, gradeThresholds]);
+
+  // Logger helper
+  const logAudit = (action: string, details: string) => {
+    const newLog: AuditLog = {
+      id: 'log_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+      timestamp: new Date().toISOString(),
+      userId: currentUser?.id || 'guest',
+      userName: currentUser?.name || 'ผู้ใช้งาน',
+      action,
+      details,
+    };
+    setAuditLogs((prev) => [newLog, ...prev.slice(0, 99)]);
+  };
+
+  // Auth methods
+  const login = (username: string, password: string): { success: boolean; message?: string } => {
+    const trimmedUser = username.trim().toLowerCase();
+    const foundUser = users.find(
+      (u) =>
+        (u.username && u.username.toLowerCase() === trimmedUser) ||
+        u.email.toLowerCase() === trimmedUser ||
+        u.id.toLowerCase() === trimmedUser
+    );
+
+    if (!foundUser) {
+      return { success: false, message: 'ไม่พบบัญชีผู้ใช้งานนี้ในระบบ' };
+    }
+
+    if (foundUser.password && foundUser.password !== password) {
+      return { success: false, message: 'รหัสผ่านไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง' };
+    }
+
+    setCurrentUser(foundUser);
+    setIsAuthenticated(true);
+    logAudit('USER_LOGIN', `เข้าสู่ระบบสำเร็จในฐานะ ${foundUser.name} (${foundUser.position})`);
+
+    // Direct to proper view based on role
+    if (foundUser.role === 'staff') {
+      setActiveView('my_evaluation');
+      setSelectedEvaluateeId(foundUser.id);
+    } else {
+      setActiveView('dashboard');
+    }
+
+    return { success: true };
+  };
+
+  const loginAsUser = (user: User) => {
+    setCurrentUser(user);
+    setIsAuthenticated(true);
+    logAudit('DEMO_SWITCH_USER', `สลับตัวตนทดสอบ (Demo) เป็น ${user.name} (${user.position})`);
+
+    if (user.role === 'staff') {
+      setActiveView('my_evaluation');
+      setSelectedEvaluateeId(user.id);
+    } else {
+      setActiveView('dashboard');
+    }
+  };
+
+  const logout = () => {
+    logAudit('USER_LOGOUT', `ออกจากระบบ: ${currentUser.name}`);
+    setIsAuthenticated(false);
+  };
+
+  // Submissions
+  const submitEvaluation = async (
+    data: Omit<EvaluationSubmission, 'id' | 'submittedAt'>
+  ): Promise<EvaluationSubmission> => {
+    const newId = 'sub_' + Date.now();
+    const newSubmission: EvaluationSubmission = {
+      ...data,
+      id: newId,
+      submittedAt: new Date().toISOString(),
+      isDraft: false,
+    };
+
+    setSubmissions((prev) => {
+      const filtered = prev.filter(
+        (s) => !(s.evaluateeId === data.evaluateeId && s.evaluatorId === data.evaluatorId)
+      );
+      return [newSubmission, ...filtered];
+    });
+
+    clearDraftEvaluation(data.evaluateeId, data.formId);
+
+    logAudit(
+      'SUBMIT_EVALUATION',
+      `ส่งผลการประเมินให้แก่ ${data.evaluateeName} (${data.evaluateePosition}) ได้คะแนน ${data.percentage}% [${data.grade}]`
+    );
+
+    return newSubmission;
+  };
+
+  const saveDraftEvaluation = (data: Omit<EvaluationSubmission, 'id' | 'submittedAt'>) => {
+    const draftKey = `draft_${currentUser.id}_${data.evaluateeId}_${data.formId}`;
+    const draftSubmission: EvaluationSubmission = {
+      ...data,
+      id: 'draft_' + Date.now(),
+      submittedAt: new Date().toISOString(),
+      isDraft: true,
+    };
+    localStorage.setItem(draftKey, JSON.stringify(draftSubmission));
+  };
+
+  const getDraftEvaluation = (evaluateeId: string, formId: string): EvaluationSubmission | null => {
+    const draftKey = `draft_${currentUser.id}_${evaluateeId}_${formId}`;
+    const saved = localStorage.getItem(draftKey);
+    return saved ? JSON.parse(saved) : null;
+  };
+
+  const clearDraftEvaluation = (evaluateeId: string, formId: string) => {
+    const draftKey = `draft_${currentUser.id}_${evaluateeId}_${formId}`;
+    localStorage.removeItem(draftKey);
+  };
+
+  // Delete evaluation by submission ID
+  const deleteSubmission = (submissionId: string) => {
+    const target = submissions.find((s) => s.id === submissionId);
+    if (!target) return;
+
+    setSubmissions((prev) => prev.filter((s) => s.id !== submissionId));
+    clearDraftEvaluation(target.evaluateeId, target.formId);
+
+    logAudit(
+      'DELETE_EVALUATION',
+      `ลบผลการประเมินของกรรมการ: ${target.evaluatorName} ที่ประเมินให้แก่: ${target.evaluateeName} (${target.percentage}% [${target.grade}])`
+    );
+  };
+
+  // Evaluator or Admin deletes evaluation for a specific candidate & evaluator
+  const deleteEvaluationByEvaluator = (evaluateeId: string, evaluatorId: string) => {
+    const target = submissions.find(
+      (s) => s.evaluateeId === evaluateeId && s.evaluatorId === evaluatorId
+    );
+    if (!target) return;
+
+    setSubmissions((prev) =>
+      prev.filter((s) => !(s.evaluateeId === evaluateeId && s.evaluatorId === evaluatorId))
+    );
+    clearDraftEvaluation(evaluateeId, target.formId);
+
+    logAudit(
+      'DELETE_EVALUATION',
+      `ลบผลคะแนนการประเมิน: ผู้ประเมิน ${target.evaluatorName} -> ผู้รับการประเมิน ${target.evaluateeName}`
+    );
+  };
+
+  // Update existing evaluation submission
+  const updateSubmission = (updatedSubmission: EvaluationSubmission) => {
+    setSubmissions((prev) =>
+      prev.map((s) => (s.id === updatedSubmission.id ? { ...updatedSubmission, submittedAt: new Date().toISOString() } : s))
+    );
+    logAudit(
+      'UPDATE_EVALUATION',
+      `แก้ไขคะแนนการประเมิน: ${updatedSubmission.evaluatorName} ให้แก่ ${updatedSubmission.evaluateeName} เป็น ${updatedSubmission.percentage}% [${updatedSubmission.grade}]`
+    );
+  };
+
+  // Admin directly inserts or modifies an evaluation for any evaluator/candidate
+  const adminUpsertSubmission = (
+    data: Omit<EvaluationSubmission, 'id' | 'submittedAt'> & { id?: string }
+  ): EvaluationSubmission => {
+    const submissionId = data.id || 'sub_admin_' + Date.now();
+    const finalSubmission: EvaluationSubmission = {
+      ...data,
+      id: submissionId,
+      submittedAt: new Date().toISOString(),
+      isDraft: false,
+    };
+
+    setSubmissions((prev) => {
+      const filtered = prev.filter(
+        (s) =>
+          !(
+            (data.id && s.id === data.id) ||
+            (s.evaluateeId === data.evaluateeId && s.evaluatorId === data.evaluatorId)
+          )
+      );
+      return [finalSubmission, ...filtered];
+    });
+
+    logAudit(
+      'ADMIN_OVERRIDE_EVALUATION',
+      `[ผู้ดูแลระบบ] บันทึก/ปรับปรุงคะแนน: ${data.evaluatorName} -> ${data.evaluateeName} คะแนน ${data.percentage}% [${data.grade}]`
+    );
+
+    return finalSubmission;
+  };
+
+  // Committee Group CRUD
+  const updateCommitteeGroup = (group: CommitteeGroup) => {
+    setCommitteeGroups((prev) => prev.map((g) => (g.id === group.id ? group : g)));
+    logAudit('UPDATE_COMMITTEE_GROUP', `แก้ไขข้อมูลกลุ่มคณะกรรมการ: ${group.name}`);
+  };
+
+  const addCommitteeGroup = (groupData: Omit<CommitteeGroup, 'id' | 'createdAt'>) => {
+    const newGroup: CommitteeGroup = {
+      ...groupData,
+      id: 'group_' + (committeeGroups.length + 1) + '_' + Date.now().toString(36),
+      createdAt: new Date().toISOString(),
+    };
+    setCommitteeGroups((prev) => [...prev, newGroup]);
+    logAudit('CREATE_COMMITTEE_GROUP', `สร้างกลุ่มคณะกรรมการใหม่: ${newGroup.name}`);
+  };
+
+  const deleteCommitteeGroup = (groupId: string) => {
+    setCommitteeGroups((prev) => prev.filter((g) => g.id !== groupId));
+    logAudit('DELETE_COMMITTEE_GROUP', `ลบกลุ่มคณะกรรมการรหัส: ${groupId}`);
+  };
+
+  // User Management CRUD
+  const addUser = (userData: Omit<User, 'id'>): User => {
+    const newId = (userData.role === 'evaluator' ? 'evaluator_' : userData.role === 'admin' ? 'user_admin_' : 'staff_') + Date.now();
+    const newUser: User = {
+      ...userData,
+      id: newId,
+      password: userData.password || 'password123',
+    };
+    setUsers((prev) => [newUser, ...prev]);
+    logAudit('CREATE_USER', `เพิ่มผู้ใช้งานใหม่: ${newUser.name} (${newUser.position}) [${newUser.role}]`);
+    return newUser;
+  };
+
+  const updateUser = (user: User) => {
+    setUsers((prev) => prev.map((u) => (u.id === user.id ? user : u)));
+    if (currentUser.id === user.id) {
+      setCurrentUser(user);
+    }
+    logAudit('UPDATE_USER', `แก้ไขข้อมูลผู้ใช้งาน: ${user.name} (${user.position})`);
+  };
+
+  const updateUserProfile = (userId: string, updates: Partial<User>) => {
+    setUsers((prev) =>
+      prev.map((u) => {
+        if (u.id === userId) {
+          const updatedUser = { ...u, ...updates };
+          return updatedUser;
+        }
+        return u;
+      })
+    );
+    if (currentUser.id === userId) {
+      setCurrentUser((prev) => ({ ...prev, ...updates }));
+    }
+    logAudit('UPDATE_PROFILE', `อัปเดตข้อมูลโปรไฟล์และรูปภาพ: ${updates.name || currentUser.name}`);
+  };
+
+  const updateSystemSettings = (newSettings: Partial<SystemSettings>) => {
+    setSystemSettings((prev) => {
+      const updated = { ...prev, ...newSettings };
+      return updated;
+    });
+    logAudit('UPDATE_SYSTEM_SETTINGS', `แก้ไขการตั้งค่าระบบ: ชื่อแอพ/ชื่อโรงเรียน/โลโก้/โหมดทดสอบ`);
+  };
+
+  const resetSystemSettings = () => {
+    setSystemSettings(DEFAULT_SETTINGS);
+    logAudit('RESET_SYSTEM_SETTINGS', 'คืนค่าการตั้งค่าระบบเป็นค่าเริ่มต้น');
+  };
+
+  const deleteUser = (userId: string) => {
+    const userToDelete = users.find((u) => u.id === userId);
+    setUsers((prev) => prev.filter((u) => u.id !== userId));
+    logAudit('DELETE_USER', `ลบผู้ใช้งาน: ${userToDelete?.name || userId}`);
+  };
+
+  const resetUserPassword = (userId: string, newPassword: string) => {
+    setUsers((prev) =>
+      prev.map((u) => (u.id === userId ? { ...u, password: newPassword } : u))
+    );
+    const user = users.find((u) => u.id === userId);
+    logAudit('RESET_USER_PASSWORD', `รีเซ็ตรหัสผ่านของผู้ใช้งาน: ${user?.name || userId}`);
+  };
+
+  // Form Management CRUD
+  const updateFormTemplate = (form: FormTemplate) => {
+    setFormTemplates((prev) => prev.map((f) => (f.id === form.id ? form : f)));
+    logAudit('UPDATE_FORM_TEMPLATE', `ปรับปรุงแบบประเมิน: ${form.title}`);
+  };
+
+  const addFormTemplate = (formData: Omit<FormTemplate, 'id'>): FormTemplate => {
+    const newId = 'form_custom_' + Date.now();
+    const newForm: FormTemplate = {
+      ...formData,
+      id: newId,
+      isCustom: true,
+    };
+    setFormTemplates((prev) => [newForm, ...prev]);
+    logAudit('CREATE_FORM_TEMPLATE', `สร้างแบบประเมินใหม่: ${newForm.title}`);
+    return newForm;
+  };
+
+  const deleteFormTemplate = (formId: string) => {
+    const form = formTemplates.find((f) => f.id === formId);
+    setFormTemplates((prev) => prev.filter((f) => f.id !== formId));
+    logAudit('DELETE_FORM_TEMPLATE', `ลบแบบประเมิน: ${form?.title || formId}`);
+  };
+
+  const resetFormTemplatesToDefault = () => {
+    setFormTemplates(FORM_TEMPLATES);
+    logAudit('RESET_FORM_TEMPLATES', 'รีเซ็ตแบบประเมินทั้งหมดกลับสู่แบบฟอร์มมาตรฐาน 13 ตำแหน่ง');
+  };
+
+  const updateGradeThresholds = (thresholds: GradeThreshold[]) => {
+    setGradeThresholds(thresholds);
+    logAudit('UPDATE_THRESHOLDS', 'ปรับปรุงเกณฑ์การตัดระดับผลการประเมิน (5 ระดับ)');
+  };
+
+  const resetAllDataToDefault = () => {
+    setUsers(INITIAL_USERS);
+    setCurrentUser(INITIAL_USERS[1]);
+    setIsAuthenticated(true);
+    setCommitteeGroups(INITIAL_COMMITTEE_GROUPS);
+    setFormTemplates(FORM_TEMPLATES);
+    setSubmissions(INITIAL_SUBMISSIONS);
+    setGradeThresholds(GRADE_THRESHOLDS);
+    localStorage.clear();
+    logAudit('RESET_SYSTEM', 'รีเซ็ตข้อมูลระบบกลับสู่ค่าเริ่มต้นจากโรงงาน');
+  };
+
+  return (
+    <AppContext.Provider
+      value={{
+        currentUser,
+        setCurrentUser,
+        isAuthenticated,
+        login,
+        loginAsUser,
+        logout,
+        systemSettings,
+        updateSystemSettings,
+        resetSystemSettings,
+        users,
+        committeeGroups,
+        formTemplates,
+        gradeThresholds,
+        submissions,
+        auditLogs,
+        aggregatedResults,
+        activeView,
+        setActiveView,
+        selectedFormId,
+        setSelectedFormId,
+        selectedEvaluateeId,
+        setSelectedEvaluateeId,
+        submitEvaluation,
+        saveDraftEvaluation,
+        getDraftEvaluation,
+        clearDraftEvaluation,
+        deleteSubmission,
+        deleteEvaluationByEvaluator,
+        updateSubmission,
+        adminUpsertSubmission,
+        updateCommitteeGroup,
+        addCommitteeGroup,
+        deleteCommitteeGroup,
+        addUser,
+        updateUser,
+        updateUserProfile,
+        deleteUser,
+        resetUserPassword,
+        updateFormTemplate,
+        addFormTemplate,
+        deleteFormTemplate,
+        resetFormTemplatesToDefault,
+        updateGradeThresholds,
+        resetAllDataToDefault,
+      }}
+    >
+      {children}
+    </AppContext.Provider>
+  );
+};
+
+export const useApp = () => {
+  const context = useContext(AppContext);
+  if (!context) {
+    throw new Error('useApp must be used within an AppProvider');
+  }
+  return context;
+};
