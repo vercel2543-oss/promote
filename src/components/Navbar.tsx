@@ -47,7 +47,22 @@ export const Navbar: React.FC = () => {
     systemSettings,
     isFirebaseSyncing,
     isFirebaseConnected,
+    syncAllToFirebase,
   } = useApp();
+
+  const [syncToast, setSyncToast] = useState<string | null>(null);
+
+  const handleManualSync = async () => {
+    try {
+      setSyncToast('กำลังเชื่อมต่อและซิงค์ข้อมูลกับ Firebase Cloud...');
+      await syncAllToFirebase();
+      setSyncToast('ซิงค์ข้อมูลตรงกันทุกอุปกรณ์สำเร็จ!');
+      setTimeout(() => setSyncToast(null), 3000);
+    } catch (e) {
+      setSyncToast('เกิดข้อผิดพลาดในการซิงค์ข้อมูล');
+      setTimeout(() => setSyncToast(null), 3000);
+    }
+  };
 
   const [isPersonaModalOpen, setIsPersonaModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
@@ -181,10 +196,13 @@ export const Navbar: React.FC = () => {
 
             {/* Right: Demo Switcher & User Profile Menu */}
             <div className="flex items-center gap-2">
-              {/* Cloud Realtime Sync Indicator */}
-              <div
-                className="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-100/80 border border-slate-200/80 text-[11px] font-semibold text-slate-700 select-none shadow-2xs"
-                title="ระบบเชื่อมต่อฐานข้อมูล Firebase Firestore Cloud ข้อมูลซิงค์สดเรียลไทม์ตรงกันทุกอุปกรณ์ทั้ง PC, iOS และ Android"
+              {/* Cloud Realtime Sync Indicator / Button */}
+              <button
+                type="button"
+                onClick={handleManualSync}
+                disabled={isFirebaseSyncing}
+                className="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200/80 active:scale-95 border border-slate-200/80 text-[11px] font-semibold text-slate-700 transition cursor-pointer shadow-2xs"
+                title="คลิกเพื่อซิงค์ข้อมูลล่าสุดกับ Firebase Cloud ทันที (เชื่อมต่อสด PC, iOS, Android)"
               >
                 {isFirebaseSyncing ? (
                   <RefreshCw className="w-3.5 h-3.5 text-blue-600 animate-spin" />
@@ -198,7 +216,15 @@ export const Navbar: React.FC = () => {
                 <span className="text-slate-600 text-[11px]">
                   {isFirebaseSyncing ? 'กำลังซิงค์...' : 'Cloud Realtime'}
                 </span>
-              </div>
+              </button>
+
+              {/* Sync Toast Popup */}
+              {syncToast && (
+                <div className="fixed top-16 right-4 z-50 px-4 py-2.5 bg-slate-900 text-white text-xs rounded-xl shadow-xl border border-slate-700 flex items-center gap-2 animate-in fade-in slide-in-from-top-2">
+                  <Cloud className="w-4 h-4 text-emerald-400" />
+                  <span>{syncToast}</span>
+                </div>
+              )}
 
               {/* Quick Demo Switcher Button (Only shown if isDemoMode is TRUE) */}
               {systemSettings.isDemoMode && (
@@ -472,16 +498,25 @@ export const Navbar: React.FC = () => {
             {/* Drawer Bottom Actions */}
             <div className="p-4 border-t border-slate-100 bg-slate-50 space-y-2">
               {/* Cloud Sync Status on Mobile */}
-              <div className="flex items-center justify-between p-2.5 rounded-xl bg-white border border-slate-200 text-xs">
+              <button
+                type="button"
+                onClick={handleManualSync}
+                disabled={isFirebaseSyncing}
+                className="w-full flex items-center justify-between p-2.5 rounded-xl bg-white hover:bg-slate-100/80 active:scale-95 border border-slate-200 text-xs transition cursor-pointer"
+              >
                 <div className="flex items-center gap-2">
-                  <Cloud className="w-4 h-4 text-blue-600" />
+                  {isFirebaseSyncing ? (
+                    <RefreshCw className="w-4 h-4 text-blue-600 animate-spin" />
+                  ) : (
+                    <Cloud className="w-4 h-4 text-blue-600" />
+                  )}
                   <span className="font-semibold text-slate-700">Firebase Firestore</span>
                 </div>
                 <span className="flex items-center gap-1.5 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                  ซิงค์สดเรียลไทม์
+                  {isFirebaseSyncing ? 'กำลังซิงค์...' : 'แตะเพื่อซิงค์สด'}
                 </span>
-              </div>
+              </button>
 
               {systemSettings.isDemoMode && (
                 <button

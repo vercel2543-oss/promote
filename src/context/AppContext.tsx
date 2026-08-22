@@ -228,10 +228,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       try {
         setIsFirebaseSyncing(true);
 
-        // Check if Firestore already has remote data
+        // Verify remote users and settings count in Firestore
+        const remoteUsers = await FirebaseService.getUsers();
         const remoteSettings = await FirebaseService.getSystemSettings();
-        if (!remoteSettings) {
-          console.log('Bootstrapping initial data to Firebase Firestore...');
+
+        // If Firestore is empty or has an older partial dataset (< 30 staff members)
+        if (!remoteSettings || !remoteUsers || remoteUsers.length < 30) {
+          console.log('Syncing and seeding complete initial dataset (30 evaluatees + committees) to Firebase Firestore...');
           await FirebaseService.seedInitialData(
             INITIAL_USERS,
             INITIAL_COMMITTEE_GROUPS,
