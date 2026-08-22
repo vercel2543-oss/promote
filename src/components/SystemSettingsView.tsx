@@ -25,13 +25,27 @@ import {
   Link,
   Download,
   FileImage,
+  Database,
+  RefreshCw,
+  Cloud,
+  CloudCheck,
 } from 'lucide-react';
 import { PRESET_LOGOS, PES_GOLD_LOGO } from '../data/presetLogos';
 
 export const SystemSettingsView: React.FC = () => {
-  const { systemSettings, updateSystemSettings, resetSystemSettings, currentUser } = useApp();
+  const {
+    systemSettings,
+    updateSystemSettings,
+    resetSystemSettings,
+    currentUser,
+    isFirebaseSyncing,
+    isFirebaseConnected,
+    syncAllToFirebase,
+  } = useApp();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isSyncingManual, setIsSyncingManual] = useState(false);
+  const [syncSuccessMsg, setSyncSuccessMsg] = useState('');
 
   const [formData, setFormData] = useState({
     appName: systemSettings.appName,
@@ -146,7 +160,29 @@ export const SystemSettingsView: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <button
+              type="button"
+              disabled={isSyncingManual || isFirebaseSyncing}
+              onClick={async () => {
+                try {
+                  setIsSyncingManual(true);
+                  await syncAllToFirebase();
+                  setSyncSuccessMsg('ซิงค์ข้อมูลทั้งหมดขึ้นฐานข้อมูล Firebase สำเร็จเรียบร้อย');
+                  setTimeout(() => setSyncSuccessMsg(''), 4000);
+                } catch (e) {
+                  alert('เกิดข้อผิดพลาดในการเชื่อมต่อ Firebase');
+                } finally {
+                  setIsSyncingManual(false);
+                }
+              }}
+              className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-blue-600/60 hover:bg-blue-600 text-white text-xs font-semibold transition border border-blue-400/30 cursor-pointer"
+              title="ซิงค์ข้อมูลทั้งหมดขึ้นฐานข้อมูล Firebase Firestore Cloud"
+            >
+              <RefreshCw className={`w-4 h-4 ${isSyncingManual || isFirebaseSyncing ? 'animate-spin' : ''}`} />
+              <span>{isSyncingManual ? 'กำลังซิงค์ Cloud...' : 'ซิงค์ข้อมูลขึ้น Firebase'}</span>
+            </button>
+
             <button
               type="button"
               onClick={handleReset}
@@ -220,6 +256,25 @@ export const SystemSettingsView: React.FC = () => {
       </div>
 
       {/* Success Toast */}
+      {syncSuccessMsg && (
+        <div className="p-4 rounded-2xl bg-blue-50 border border-blue-200 text-blue-900 flex items-center justify-between shadow-md animate-in slide-in-from-top-2">
+          <div className="flex items-center gap-3">
+            <Database className="w-5 h-5 text-blue-600 shrink-0" />
+            <div>
+              <h4 className="font-bold text-xs sm:text-sm">ฐานข้อมูล Firebase Firestore เชื่อมต่อสมบูรณ์</h4>
+              <p className="text-[11px] text-blue-700">{syncSuccessMsg}</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setSyncSuccessMsg('')}
+            className="text-xs text-blue-700 font-bold hover:underline"
+          >
+            ปิด
+          </button>
+        </div>
+      )}
+
       {isSaved && (
         <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 flex items-center justify-between shadow-md animate-in slide-in-from-top-2">
           <div className="flex items-center gap-3">
@@ -701,14 +756,38 @@ export const SystemSettingsView: React.FC = () => {
               </div>
             </div>
 
+            {/* Firebase Database Connection Status */}
+            <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/90 text-xs space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="font-bold text-slate-800 flex items-center gap-1.5">
+                  <Database className="w-4 h-4 text-amber-500" />
+                  <span>ฐานข้อมูล Firebase Firestore</span>
+                </div>
+                <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                  เชื่อมต่อแล้ว
+                </span>
+              </div>
+              <div className="text-[11px] text-slate-600 space-y-1">
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Project ID:</span>
+                  <span className="font-mono font-semibold text-slate-700">promote-b4836</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Database:</span>
+                  <span className="font-semibold text-slate-700">Firestore (Realtime Sync)</span>
+                </div>
+              </div>
+            </div>
+
             {/* Quick Status Info */}
             <div className="p-3 rounded-2xl bg-blue-50/70 border border-blue-100 text-xs text-blue-900 space-y-1">
               <div className="font-bold flex items-center gap-1.5">
                 <ShieldCheck className="w-4 h-4 text-blue-600" />
-                <span>การบันทึกข้อมูลแบบเรียลไทม์</span>
+                <span>การบันทึกข้อมูลแบบเรียลไทม์ (Cloud Sync)</span>
               </div>
               <p className="text-[11px] text-blue-700">
-                ข้อมูลการตั้งค่าจะถูกจัดเก็บในระบบอย่างปลอดภัย และแสดงผลทันทีทุกส่วนของแอปพลิเคชัน
+                ข้อมูลการประเมิน ผลคะแนน ผู้ใช้งาน และการตั้งค่าจะถูกจัดเก็บบน Firebase Firestore และอัปเดตแบบ Realtime ทุกอุปกรณ์
               </p>
             </div>
 

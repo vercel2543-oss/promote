@@ -18,6 +18,7 @@ import {
 import { FORM_TEMPLATES } from '../data/formTemplates';
 import { calculateAggregatedResult } from '../utils/evaluationCalculator';
 import { CHAINAT_SCHOOL_LOGO } from '../data/presetLogos';
+import { FirebaseService } from '../firebase/firebaseService';
 
 export type ViewType =
   | 'dashboard'
@@ -64,6 +65,11 @@ interface AppContextType {
   submissions: EvaluationSubmission[];
   auditLogs: AuditLog[];
   aggregatedResults: AggregatedResult[];
+
+  // Firebase status
+  isFirebaseSyncing: boolean;
+  isFirebaseConnected: boolean;
+  syncAllToFirebase: () => Promise<void>;
   
   // Navigation / Active Context
   activeView: ViewType;
@@ -109,18 +115,22 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 const STORAGE_KEYS = {
-  CURRENT_USER: 'pes_current_user_v8',
-  IS_AUTH: 'pes_is_auth_v8',
-  USERS: 'pes_users_v8',
-  GROUPS: 'pes_groups_v8',
-  TEMPLATES: 'pes_templates_v8',
-  SUBMISSIONS: 'pes_submissions_v8',
-  THRESHOLDS: 'pes_thresholds_v8',
-  AUDIT_LOGS: 'pes_audit_logs_v8',
-  SETTINGS: 'pes_settings_v8',
+  CURRENT_USER: 'pes_current_user_v9',
+  IS_AUTH: 'pes_is_auth_v9',
+  USERS: 'pes_users_v9',
+  GROUPS: 'pes_groups_v9',
+  TEMPLATES: 'pes_templates_v9',
+  SUBMISSIONS: 'pes_submissions_v9',
+  THRESHOLDS: 'pes_thresholds_v9',
+  AUDIT_LOGS: 'pes_audit_logs_v9',
+  SETTINGS: 'pes_settings_v9',
+  FIREBASE_INITIALIZED: 'pes_firebase_initialized_v9',
 };
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [isFirebaseSyncing, setIsFirebaseSyncing] = useState<boolean>(false);
+  const [isFirebaseConnected, setIsFirebaseConnected] = useState<boolean>(true);
+
   // 1. Users state
   const [users, setUsers] = useState<User[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.USERS);
@@ -143,7 +153,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // 2. Auth state
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.IS_AUTH);
-    return saved ? JSON.parse(saved) : true; // Default true for instant preview, can be toggled/logged out
+    return saved ? JSON.parse(saved) : true;
   });
 
   const [currentUser, setCurrentUser] = useState<User>(() => {
@@ -155,7 +165,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         // fallback
       }
     }
-    // Default to Evaluator 1 (นางสาวอรวรรณ พงษ์ศิริ - ประธานกรรมการ ชุดที่ 1)
     return INITIAL_USERS[1];
   });
 
@@ -205,7 +214,87 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [selectedFormId, setSelectedFormId] = useState<string>('form_teacher_assistant');
   const [selectedEvaluateeId, setSelectedEvaluateeId] = useState<string>('staff_1');
 
-  // Persistence Sync
+  // Firebase Realtime Synchronization Listeners
+  useEffect(() => {
+    let unsubUsers: (() => void) | undefined;
+    let unsubGroups: (() => void) | undefined;
+    let unsubTemplates: (() => void) | undefined;
+    let unsubSubs: (() => void) | undefined;
+    let unsubSettings: (() => void) | undefined;
+
+    const setupFirebaseSync = async () => {
+      try {
+        setIsFirebaseSyncing(true);
+
+        // Check if first-time seed is needed in Firestore
+        const isSeeded = localStorage.getItem(STORAGE_KEYS.FIREBASE_INITIALIZED);
+        if (!isSeeded) {
+          const remoteSettings = await FirebaseService.getSystemSettings();
+          if (!remoteSettings) {
+            console.log('Seeding initial data to Firebase Firestore...');
+            await FirebaseService.seedInitialData(
+              INITIAL_USERS,
+              INITIAL_COMMITTEE_GROUPS,
+              FORM_TEMPLATES,
+              INITIAL_SUBMISSIONS,
+              DEFAULT_SETTINGS
+            );
+          }
+          localStorage.setItem(STORAGE_KEYS.FIREBASE_INITIALIZED, 'true');
+        }
+
+        // Setup real-time listeners
+        unsubSettings = FirebaseService.listenSystemSettings((remoteSettings) => {
+          if (remoteSettings) {
+            setSystemSettings((prev) => ({ ...prev, ...remoteSettings }));
+          }
+        });
+
+        unsubUsers = FirebaseService.listenUsers((remoteUsers) => {
+          if (remoteUsers && remoteUsers.length > 0) {
+            setUsers(remoteUsers);
+          }
+        });
+
+        unsubGroups = FirebaseService.listenCommitteeGroups((remoteGroups) => {
+          if (remoteGroups && remoteGroups.length > 0) {
+            setCommitteeGroups(remoteGroups);
+          }
+        });
+
+        unsubTemplates = FirebaseService.listenFormTemplates((remoteTemplates) => {
+          if (remoteTemplates && remoteTemplates.length > 0) {
+            setFormTemplates(remoteTemplates);
+          }
+        });
+
+        unsubSubs = FirebaseService.listenSubmissions((remoteSubs) => {
+          if (remoteSubs) {
+            setSubmissions(remoteSubs);
+          }
+        });
+
+        setIsFirebaseConnected(true);
+      } catch (err) {
+        console.error('Firebase sync listener initialization error:', err);
+        setIsFirebaseConnected(false);
+      } finally {
+        setIsFirebaseSyncing(false);
+      }
+    };
+
+    setupFirebaseSync();
+
+    return () => {
+      if (unsubUsers) unsubUsers();
+      if (unsubGroups) unsubGroups();
+      if (unsubTemplates) unsubTemplates();
+      if (unsubSubs) unsubSubs();
+      if (unsubSettings) unsubSettings();
+    };
+  }, []);
+
+  // Persistence to local storage for fast instant load
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(currentUser));
   }, [currentUser]);
@@ -250,12 +339,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const evaluateeUsers = users.filter((u) => u.role === 'staff');
 
     evaluateeUsers.forEach((evaluatee) => {
-      // Find matching committee group
       const assignedGroup =
         committeeGroups.find((g) => g.assignedEvaluateeIds.includes(evaluatee.id)) ||
         committeeGroups[0];
 
-      // Find matching form template
       const matchingForm =
         formTemplates.find(
           (t) =>
@@ -288,6 +375,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       details,
     };
     setAuditLogs((prev) => [newLog, ...prev.slice(0, 99)]);
+    FirebaseService.addAuditLog(newLog).catch(console.error);
+  };
+
+  // Explicit sync button
+  const syncAllToFirebase = async () => {
+    setIsFirebaseSyncing(true);
+    try {
+      await FirebaseService.seedInitialData(
+        users,
+        committeeGroups,
+        formTemplates,
+        submissions,
+        systemSettings
+      );
+      logAudit('FIREBASE_SYNC_ALL', 'ซิงค์ข้อมูลทั้งหมดขึ้นฐานข้อมูล Firebase สำเร็จ');
+      setIsFirebaseConnected(true);
+    } catch (e) {
+      console.error('Firebase manual sync error:', e);
+      throw e;
+    } finally {
+      setIsFirebaseSyncing(false);
+    }
   };
 
   // Auth methods
@@ -312,7 +421,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setIsAuthenticated(true);
     logAudit('USER_LOGIN', `เข้าสู่ระบบสำเร็จในฐานะ ${foundUser.name} (${foundUser.position})`);
 
-    // Direct to proper view based on role
     if (foundUser.role === 'staff') {
       setActiveView('my_evaluation');
       setSelectedEvaluateeId(foundUser.id);
@@ -362,6 +470,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     clearDraftEvaluation(data.evaluateeId, data.formId);
 
+    // Save to Firebase
+    FirebaseService.saveSubmission(newSubmission).catch(console.error);
+
     logAudit(
       'SUBMIT_EVALUATION',
       `ส่งผลการประเมินให้แก่ ${data.evaluateeName} (${data.evaluateePosition}) ได้คะแนน ${data.percentage}% [${data.grade}]`
@@ -400,6 +511,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setSubmissions((prev) => prev.filter((s) => s.id !== submissionId));
     clearDraftEvaluation(target.evaluateeId, target.formId);
 
+    FirebaseService.deleteSubmission(submissionId).catch(console.error);
+
     logAudit(
       'DELETE_EVALUATION',
       `ลบผลการประเมินของกรรมการ: ${target.evaluatorName} ที่ประเมินให้แก่: ${target.evaluateeName} (${target.percentage}% [${target.grade}])`
@@ -418,6 +531,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
     clearDraftEvaluation(evaluateeId, target.formId);
 
+    if (target.id) {
+      FirebaseService.deleteSubmission(target.id).catch(console.error);
+    }
+
     logAudit(
       'DELETE_EVALUATION',
       `ลบผลคะแนนการประเมิน: ผู้ประเมิน ${target.evaluatorName} -> ผู้รับการประเมิน ${target.evaluateeName}`
@@ -426,9 +543,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Update existing evaluation submission
   const updateSubmission = (updatedSubmission: EvaluationSubmission) => {
+    const finalized = { ...updatedSubmission, submittedAt: new Date().toISOString() };
     setSubmissions((prev) =>
-      prev.map((s) => (s.id === updatedSubmission.id ? { ...updatedSubmission, submittedAt: new Date().toISOString() } : s))
+      prev.map((s) => (s.id === finalized.id ? finalized : s))
     );
+    FirebaseService.saveSubmission(finalized).catch(console.error);
     logAudit(
       'UPDATE_EVALUATION',
       `แก้ไขคะแนนการประเมิน: ${updatedSubmission.evaluatorName} ให้แก่ ${updatedSubmission.evaluateeName} เป็น ${updatedSubmission.percentage}% [${updatedSubmission.grade}]`
@@ -458,6 +577,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return [finalSubmission, ...filtered];
     });
 
+    FirebaseService.saveSubmission(finalSubmission).catch(console.error);
+
     logAudit(
       'ADMIN_OVERRIDE_EVALUATION',
       `[ผู้ดูแลระบบ] บันทึก/ปรับปรุงคะแนน: ${data.evaluatorName} -> ${data.evaluateeName} คะแนน ${data.percentage}% [${data.grade}]`
@@ -469,6 +590,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Committee Group CRUD
   const updateCommitteeGroup = (group: CommitteeGroup) => {
     setCommitteeGroups((prev) => prev.map((g) => (g.id === group.id ? group : g)));
+    FirebaseService.saveCommitteeGroup(group).catch(console.error);
     logAudit('UPDATE_COMMITTEE_GROUP', `แก้ไขข้อมูลกลุ่มคณะกรรมการ: ${group.name}`);
   };
 
@@ -479,11 +601,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       createdAt: new Date().toISOString(),
     };
     setCommitteeGroups((prev) => [...prev, newGroup]);
+    FirebaseService.saveCommitteeGroup(newGroup).catch(console.error);
     logAudit('CREATE_COMMITTEE_GROUP', `สร้างกลุ่มคณะกรรมการใหม่: ${newGroup.name}`);
   };
 
   const deleteCommitteeGroup = (groupId: string) => {
     setCommitteeGroups((prev) => prev.filter((g) => g.id !== groupId));
+    FirebaseService.deleteCommitteeGroup(groupId).catch(console.error);
     logAudit('DELETE_COMMITTEE_GROUP', `ลบกลุ่มคณะกรรมการรหัส: ${groupId}`);
   };
 
@@ -496,6 +620,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       password: userData.password || 'password123',
     };
     setUsers((prev) => [newUser, ...prev]);
+    FirebaseService.saveUser(newUser).catch(console.error);
     logAudit('CREATE_USER', `เพิ่มผู้ใช้งานใหม่: ${newUser.name} (${newUser.position}) [${newUser.role}]`);
     return newUser;
   };
@@ -505,6 +630,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (currentUser.id === user.id) {
       setCurrentUser(user);
     }
+    FirebaseService.saveUser(user).catch(console.error);
     logAudit('UPDATE_USER', `แก้ไขข้อมูลผู้ใช้งาน: ${user.name} (${user.position})`);
   };
 
@@ -513,6 +639,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       prev.map((u) => {
         if (u.id === userId) {
           const updatedUser = { ...u, ...updates };
+          FirebaseService.saveUser(updatedUser).catch(console.error);
           return updatedUser;
         }
         return u;
@@ -527,6 +654,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateSystemSettings = (newSettings: Partial<SystemSettings>) => {
     setSystemSettings((prev) => {
       const updated = { ...prev, ...newSettings };
+      FirebaseService.saveSystemSettings(updated).catch(console.error);
       return updated;
     });
     logAudit('UPDATE_SYSTEM_SETTINGS', `แก้ไขการตั้งค่าระบบ: ชื่อแอพ/ชื่อโรงเรียน/โลโก้/โหมดทดสอบ`);
@@ -534,18 +662,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const resetSystemSettings = () => {
     setSystemSettings(DEFAULT_SETTINGS);
+    FirebaseService.saveSystemSettings(DEFAULT_SETTINGS).catch(console.error);
     logAudit('RESET_SYSTEM_SETTINGS', 'คืนค่าการตั้งค่าระบบเป็นค่าเริ่มต้น');
   };
 
   const deleteUser = (userId: string) => {
     const userToDelete = users.find((u) => u.id === userId);
     setUsers((prev) => prev.filter((u) => u.id !== userId));
+    FirebaseService.deleteUser(userId).catch(console.error);
     logAudit('DELETE_USER', `ลบผู้ใช้งาน: ${userToDelete?.name || userId}`);
   };
 
   const resetUserPassword = (userId: string, newPassword: string) => {
     setUsers((prev) =>
-      prev.map((u) => (u.id === userId ? { ...u, password: newPassword } : u))
+      prev.map((u) => {
+        if (u.id === userId) {
+          const updated = { ...u, password: newPassword };
+          FirebaseService.saveUser(updated).catch(console.error);
+          return updated;
+        }
+        return u;
+      })
     );
     const user = users.find((u) => u.id === userId);
     logAudit('RESET_USER_PASSWORD', `รีเซ็ตรหัสผ่านของผู้ใช้งาน: ${user?.name || userId}`);
@@ -554,6 +691,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Form Management CRUD
   const updateFormTemplate = (form: FormTemplate) => {
     setFormTemplates((prev) => prev.map((f) => (f.id === form.id ? form : f)));
+    FirebaseService.saveFormTemplate(form).catch(console.error);
     logAudit('UPDATE_FORM_TEMPLATE', `ปรับปรุงแบบประเมิน: ${form.title}`);
   };
 
@@ -565,6 +703,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       isCustom: true,
     };
     setFormTemplates((prev) => [newForm, ...prev]);
+    FirebaseService.saveFormTemplate(newForm).catch(console.error);
     logAudit('CREATE_FORM_TEMPLATE', `สร้างแบบประเมินใหม่: ${newForm.title}`);
     return newForm;
   };
@@ -572,11 +711,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const deleteFormTemplate = (formId: string) => {
     const form = formTemplates.find((f) => f.id === formId);
     setFormTemplates((prev) => prev.filter((f) => f.id !== formId));
+    FirebaseService.deleteFormTemplate(formId).catch(console.error);
     logAudit('DELETE_FORM_TEMPLATE', `ลบแบบประเมิน: ${form?.title || formId}`);
   };
 
   const resetFormTemplatesToDefault = () => {
     setFormTemplates(FORM_TEMPLATES);
+    FORM_TEMPLATES.forEach((tmpl) => {
+      FirebaseService.saveFormTemplate(tmpl).catch(console.error);
+    });
     logAudit('RESET_FORM_TEMPLATES', 'รีเซ็ตแบบประเมินทั้งหมดกลับสู่แบบฟอร์มมาตรฐาน 13 ตำแหน่ง');
   };
 
@@ -594,6 +737,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setSubmissions(INITIAL_SUBMISSIONS);
     setGradeThresholds(GRADE_THRESHOLDS);
     localStorage.clear();
+    syncAllToFirebase().catch(console.error);
     logAudit('RESET_SYSTEM', 'รีเซ็ตข้อมูลระบบกลับสู่ค่าเริ่มต้นจากโรงงาน');
   };
 
@@ -616,6 +760,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         submissions,
         auditLogs,
         aggregatedResults,
+        isFirebaseSyncing,
+        isFirebaseConnected,
+        syncAllToFirebase,
         activeView,
         setActiveView,
         selectedFormId,

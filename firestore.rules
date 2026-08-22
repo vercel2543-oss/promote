@@ -1,0 +1,45 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper function
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // System Settings - Read by all, write by any signed in user or admin
+    match /systemSettings/{settingId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Users collection
+    match /users/{userId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Committee Groups
+    match /committeeGroups/{groupId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Form Templates
+    match /formTemplates/{templateId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Evaluation Submissions
+    match /submissions/{submissionId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Audit Logs
+    match /auditLogs/{logId} {
+      allow read: if true;
+      allow write: if true;
+    }
+  }
+}
