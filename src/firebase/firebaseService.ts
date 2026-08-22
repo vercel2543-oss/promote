@@ -11,7 +11,7 @@ import {
   query,
   orderBy,
   where,
-  Timestamp,
+  limit,
 } from 'firebase/firestore';
 import { db } from './config';
 import {
@@ -21,6 +21,7 @@ import {
   EvaluationSubmission,
   SystemSettings,
   AuditLog,
+  GradeThreshold,
 } from '../types';
 
 // Collection References
@@ -30,6 +31,7 @@ const TEMPLATES_COLLECTION = 'formTemplates';
 const SUBMISSIONS_COLLECTION = 'submissions';
 const SETTINGS_COLLECTION = 'systemSettings';
 const LOGS_COLLECTION = 'auditLogs';
+const THRESHOLDS_COLLECTION = 'gradeThresholds';
 
 export const FirebaseService = {
   // ----------------------------------------------------
@@ -113,7 +115,9 @@ export const FirebaseService = {
       collection(db, USERS_COLLECTION),
       (snapshot) => {
         const users = snapshot.docs.map((d) => d.data() as User);
-        callback(users);
+        if (users.length > 0) {
+          callback(users);
+        }
       },
       (error) => {
         console.error('Error listening to users:', error);
@@ -158,7 +162,9 @@ export const FirebaseService = {
       collection(db, GROUPS_COLLECTION),
       (snapshot) => {
         const groups = snapshot.docs.map((d) => d.data() as CommitteeGroup);
-        callback(groups);
+        if (groups.length > 0) {
+          callback(groups);
+        }
       },
       (error) => {
         console.error('Error listening to groups:', error);
@@ -203,7 +209,9 @@ export const FirebaseService = {
       collection(db, TEMPLATES_COLLECTION),
       (snapshot) => {
         const templates = snapshot.docs.map((d) => d.data() as FormTemplate);
-        callback(templates);
+        if (templates.length > 0) {
+          callback(templates);
+        }
       },
       (error) => {
         console.error('Error listening to templates:', error);
@@ -257,6 +265,36 @@ export const FirebaseService = {
   },
 
   // ----------------------------------------------------
+  // Grade Thresholds
+  // ----------------------------------------------------
+  async saveGradeThresholds(thresholds: GradeThreshold[]): Promise<void> {
+    try {
+      const docRef = doc(db, THRESHOLDS_COLLECTION, 'current');
+      await setDoc(docRef, { thresholds, updatedAt: new Date().toISOString() });
+    } catch (error) {
+      console.error('Error saving thresholds to Firebase:', error);
+    }
+  },
+
+  listenGradeThresholds(callback: (thresholds: GradeThreshold[]) => void) {
+    const docRef = doc(db, THRESHOLDS_COLLECTION, 'current');
+    return onSnapshot(
+      docRef,
+      (docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          if (data && Array.isArray(data.thresholds)) {
+            callback(data.thresholds as GradeThreshold[]);
+          }
+        }
+      },
+      (error) => {
+        console.error('Error listening to thresholds:', error);
+      }
+    );
+  },
+
+  // ----------------------------------------------------
   // Audit Logs
   // ----------------------------------------------------
   async addAuditLog(log: AuditLog): Promise<void> {
@@ -278,6 +316,20 @@ export const FirebaseService = {
     }
   },
 
+  listenAuditLogs(callback: (logs: AuditLog[]) => void) {
+    return onSnapshot(
+      collection(db, LOGS_COLLECTION),
+      (snapshot) => {
+        const logs = snapshot.docs.map((d) => d.data() as AuditLog);
+        logs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+        callback(logs.slice(0, 100));
+      },
+      (error) => {
+        console.error('Error listening to audit logs:', error);
+      }
+    );
+  },
+
   // ----------------------------------------------------
   // Batch Seed Initial Data to Firebase
   // ----------------------------------------------------
@@ -286,7 +338,8 @@ export const FirebaseService = {
     groups: CommitteeGroup[],
     templates: FormTemplate[],
     submissions: EvaluationSubmission[],
-    settings: SystemSettings
+    settings: SystemSettings,
+    thresholds?: GradeThreshold[]
   ): Promise<void> {
     try {
       const batch = writeBatch(db);
@@ -319,8 +372,14 @@ export const FirebaseService = {
         batch.set(sRef, sub);
       });
 
+      // 6. Thresholds
+      if (thresholds) {
+        const threshRef = doc(db, THRESHOLDS_COLLECTION, 'current');
+        batch.set(threshRef, { thresholds, updatedAt: new Date().toISOString() });
+      }
+
       await batch.commit();
-      console.log('Firebase Firestore initialized and seeded successfully!');
+      console.log('Firebase Firestore initialized and seeded successfully across all collections!');
     } catch (error) {
       console.error('Error seeding Firebase data:', error);
       throw error;

@@ -221,29 +221,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     let unsubTemplates: (() => void) | undefined;
     let unsubSubs: (() => void) | undefined;
     let unsubSettings: (() => void) | undefined;
+    let unsubThresholds: (() => void) | undefined;
+    let unsubLogs: (() => void) | undefined;
 
     const setupFirebaseSync = async () => {
       try {
         setIsFirebaseSyncing(true);
 
-        // Check if first-time seed is needed in Firestore
-        const isSeeded = localStorage.getItem(STORAGE_KEYS.FIREBASE_INITIALIZED);
-        if (!isSeeded) {
-          const remoteSettings = await FirebaseService.getSystemSettings();
-          if (!remoteSettings) {
-            console.log('Seeding initial data to Firebase Firestore...');
-            await FirebaseService.seedInitialData(
-              INITIAL_USERS,
-              INITIAL_COMMITTEE_GROUPS,
-              FORM_TEMPLATES,
-              INITIAL_SUBMISSIONS,
-              DEFAULT_SETTINGS
-            );
-          }
-          localStorage.setItem(STORAGE_KEYS.FIREBASE_INITIALIZED, 'true');
+        // Check if Firestore already has remote data
+        const remoteSettings = await FirebaseService.getSystemSettings();
+        if (!remoteSettings) {
+          console.log('Bootstrapping initial data to Firebase Firestore...');
+          await FirebaseService.seedInitialData(
+            INITIAL_USERS,
+            INITIAL_COMMITTEE_GROUPS,
+            FORM_TEMPLATES,
+            INITIAL_SUBMISSIONS,
+            DEFAULT_SETTINGS,
+            GRADE_THRESHOLDS
+          );
         }
 
-        // Setup real-time listeners
+        // Setup real-time listeners for all models across all devices (PC, Android, iOS)
         unsubSettings = FirebaseService.listenSystemSettings((remoteSettings) => {
           if (remoteSettings) {
             setSystemSettings((prev) => ({ ...prev, ...remoteSettings }));
@@ -274,6 +273,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           }
         });
 
+        unsubThresholds = FirebaseService.listenGradeThresholds((remoteThresholds) => {
+          if (remoteThresholds && remoteThresholds.length > 0) {
+            setGradeThresholds(remoteThresholds);
+          }
+        });
+
+        unsubLogs = FirebaseService.listenAuditLogs((remoteLogs) => {
+          if (remoteLogs && remoteLogs.length > 0) {
+            setAuditLogs(remoteLogs);
+          }
+        });
+
         setIsFirebaseConnected(true);
       } catch (err) {
         console.error('Firebase sync listener initialization error:', err);
@@ -291,6 +302,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (unsubTemplates) unsubTemplates();
       if (unsubSubs) unsubSubs();
       if (unsubSettings) unsubSettings();
+      if (unsubThresholds) unsubThresholds();
+      if (unsubLogs) unsubLogs();
     };
   }, []);
 
@@ -387,7 +400,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         committeeGroups,
         formTemplates,
         submissions,
-        systemSettings
+        systemSettings,
+        gradeThresholds
       );
       logAudit('FIREBASE_SYNC_ALL', 'ซิงค์ข้อมูลทั้งหมดขึ้นฐานข้อมูล Firebase สำเร็จ');
       setIsFirebaseConnected(true);
@@ -470,7 +484,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     clearDraftEvaluation(data.evaluateeId, data.formId);
 
-    // Save to Firebase
+    // Save to Firebase (triggers real-time broadcast to all connected devices)
     FirebaseService.saveSubmission(newSubmission).catch(console.error);
 
     logAudit(
@@ -725,6 +739,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateGradeThresholds = (thresholds: GradeThreshold[]) => {
     setGradeThresholds(thresholds);
+    FirebaseService.saveGradeThresholds(thresholds).catch(console.error);
     logAudit('UPDATE_THRESHOLDS', 'ปรับปรุงเกณฑ์การตัดระดับผลการประเมิน (5 ระดับ)');
   };
 
