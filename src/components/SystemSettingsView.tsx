@@ -31,10 +31,12 @@ import {
   CloudCheck,
 } from 'lucide-react';
 import { PRESET_LOGOS, PES_GOLD_LOGO } from '../data/presetLogos';
+import { TargetPositionGroupModal } from './TargetPositionGroupModal';
 
 export const SystemSettingsView: React.FC = () => {
   const {
     systemSettings,
+    targetPositionGroups,
     updateSystemSettings,
     resetSystemSettings,
     currentUser,
@@ -46,6 +48,7 @@ export const SystemSettingsView: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isSyncingManual, setIsSyncingManual] = useState(false);
   const [syncSuccessMsg, setSyncSuccessMsg] = useState('');
+  const [isTargetModalOpen, setIsTargetModalOpen] = useState(false);
 
   const [formData, setFormData] = useState({
     appName: systemSettings.appName,
@@ -59,7 +62,7 @@ export const SystemSettingsView: React.FC = () => {
   });
 
   const [isSaved, setIsSaved] = useState(false);
-  const [activeTab, setActiveTab] = useState<'general' | 'logo' | 'demo' | 'round'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'logo' | 'demo' | 'round' | 'groups'>('general');
   const [isDragging, setIsDragging] = useState(false);
   const [customUrlInput, setCustomUrlInput] = useState('');
 
@@ -251,6 +254,18 @@ export const SystemSettingsView: React.FC = () => {
             }`}
           >
             รอบและปีงบประมาณ
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('groups')}
+            className={`px-3.5 py-1.5 rounded-xl font-semibold transition whitespace-nowrap cursor-pointer ${
+              activeTab === 'groups'
+                ? 'bg-white text-slate-900 shadow-md'
+                : 'text-blue-200 hover:bg-white/10'
+            }`}
+          >
+            กลุ่มสายงานเป้าหมาย ({targetPositionGroups.length})
           </button>
         </div>
       </div>
@@ -690,6 +705,71 @@ export const SystemSettingsView: React.FC = () => {
               </div>
             </div>
           </div>
+
+          {/* Section 5: Target Job Groups */}
+          <div className="bg-white rounded-3xl p-6 sm:p-7 shadow-sm border border-slate-200/90 space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center font-bold">
+                  <Layers className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm sm:text-base text-slate-900">
+                    5. จัดการกลุ่มสายงานเป้าหมาย (Target Job Groups)
+                  </h3>
+                  <p className="text-[11px] text-slate-500">
+                    เพิ่ม ลบ แก้ไข เปลี่ยนชื่อ กำหนดสีแท็ก และจัดหมวดหมู่กลุ่มสายงานสำหรับคณะกรรมการและบุคลากร
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                id="btn-open-target-modal-from-settings"
+                onClick={() => setIsTargetModalOpen(true)}
+                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-xs transition cursor-pointer self-start sm:self-auto"
+              >
+                <Layers className="w-3.5 h-3.5" />
+                <span>จัดการ/เพิ่มกลุ่มสายงาน ({targetPositionGroups.length})</span>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 gap-2.5">
+              {targetPositionGroups.map((tg, idx) => (
+                <div
+                  key={tg.id}
+                  className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200/80 hover:bg-blue-50/30 transition text-xs"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="font-mono font-bold text-slate-400 bg-white px-2 py-0.5 rounded border border-slate-200">
+                      #{idx + 1}
+                    </span>
+                    <div>
+                      <div className="font-bold text-slate-900 flex items-center gap-2">
+                        <span>{tg.name}</span>
+                        {tg.code && tg.code !== tg.name && (
+                          <span className="text-[10px] px-2 py-0.2 rounded-full bg-blue-100 text-blue-800 font-semibold border border-blue-200">
+                            {tg.code}
+                          </span>
+                        )}
+                      </div>
+                      {tg.description && (
+                        <p className="text-[11px] text-slate-500 mt-0.5">{tg.description}</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsTargetModalOpen(true)}
+                    className="text-xs text-blue-600 hover:text-blue-800 font-bold hover:underline cursor-pointer"
+                  >
+                    แก้ไข
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* Right Col: Live Preview & Summary Card */}
@@ -802,6 +882,12 @@ export const SystemSettingsView: React.FC = () => {
           </div>
         </div>
       </form>
+
+      {/* Target Position Group Modal */}
+      <TargetPositionGroupModal
+        isOpen={isTargetModalOpen}
+        onClose={() => setIsTargetModalOpen(false)}
+      />
     </div>
   );
 };

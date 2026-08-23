@@ -4,7 +4,19 @@
 
 export type UserRole = 'admin' | 'evaluator' | 'staff';
 
-export type PositionGroup = 'teacher_assistant' | 'support_staff';
+export type PositionGroup = string; // e.g. 'teacher_assistant' | 'support_staff' or custom ID
+
+export interface TargetPositionGroup {
+  id: string; // e.g. 'teacher_assistant', 'support_staff', 'custom_group_1'
+  name: string; // e.g. "กลุ่มที่ 1: ลูกจ้างชั่วคราว ตำแหน่งครูผู้ช่วย"
+  code: string; // e.g. "G1", "ครูผู้ช่วย", "สายสนับสนุน"
+  description: string; // คำอธิบายกลุ่มสายงานเป้าหมาย
+  color?: string; // e.g. "blue", "emerald", "purple", "amber", "rose", "cyan", "indigo"
+  order?: number;
+  isDefault?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
 
 export interface User {
   id: string;

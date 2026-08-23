@@ -8,12 +8,14 @@ import {
   AggregatedResult,
   AuditLog,
   SystemSettings,
+  TargetPositionGroup,
 } from '../types';
 import {
   INITIAL_USERS,
   INITIAL_COMMITTEE_GROUPS,
   GRADE_THRESHOLDS,
   INITIAL_SUBMISSIONS,
+  INITIAL_TARGET_POSITION_GROUPS,
 } from '../data/initialData';
 import { FORM_TEMPLATES } from '../data/formTemplates';
 import { calculateAggregatedResult } from '../utils/evaluationCalculator';
@@ -60,6 +62,7 @@ interface AppContextType {
   // Data
   users: User[];
   committeeGroups: CommitteeGroup[];
+  targetPositionGroups: TargetPositionGroup[];
   formTemplates: FormTemplate[];
   gradeThresholds: GradeThreshold[];
   submissions: EvaluationSubmission[];
@@ -94,6 +97,11 @@ interface AppContextType {
   addCommitteeGroup: (group: Omit<CommitteeGroup, 'id' | 'createdAt'>) => void;
   deleteCommitteeGroup: (groupId: string) => void;
 
+  // Target Position Group (กลุ่มสายงานเป้าหมาย) CRUD
+  addTargetPositionGroup: (groupData: Omit<TargetPositionGroup, 'id'>) => TargetPositionGroup;
+  updateTargetPositionGroup: (group: TargetPositionGroup) => void;
+  deleteTargetPositionGroup: (groupId: string) => void;
+
   // User Management CRUD & Committee Profile
   addUser: (userData: Omit<User, 'id'>) => User;
   updateUser: (user: User) => void;
@@ -119,6 +127,7 @@ const STORAGE_KEYS = {
   IS_AUTH: 'pes_is_auth_v9',
   USERS: 'pes_users_v9',
   GROUPS: 'pes_groups_v9',
+  TARGET_GROUPS: 'pes_target_groups_v9',
   TEMPLATES: 'pes_templates_v9',
   SUBMISSIONS: 'pes_submissions_v9',
   THRESHOLDS: 'pes_thresholds_v9',
@@ -165,13 +174,39 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         // fallback
       }
     }
-    return INITIAL_USERS[1];
+    return INITIAL_USERS[0];
   });
 
   // 3. Committee Groups
   const [committeeGroups, setCommitteeGroups] = useState<CommitteeGroup[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.GROUPS);
     return saved ? JSON.parse(saved) : INITIAL_COMMITTEE_GROUPS;
+  });
+
+  // 3.1 Target Position Groups (กลุ่มสายงานเป้าหมาย)
+  const [targetPositionGroups, setTargetPositionGroups] = useState<TargetPositionGroup[]>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.TARGET_GROUPS);
+    if (saved) {
+      try {
+        const parsed: TargetPositionGroup[] = JSON.parse(saved);
+        // If stored data has old names, missing group 3, or redundant code suffixes, upgrade
+        const needsUpgrade =
+          parsed.length < 3 ||
+          parsed.some(
+            (g) =>
+              g.name.includes('กลุ่มที่ 1: ลูกจ้างชั่วคราว') ||
+              g.name.includes('กลุ่มที่ 2: ลูกจ้างชั่วคราว') ||
+              g.code?.includes('(ครูผู้ช่วย)') ||
+              g.code?.includes('(จ้างเหมาบริการ)')
+          );
+        if (!needsUpgrade) {
+          return parsed;
+        }
+      } catch (e) {
+        // fallback
+      }
+    }
+    return INITIAL_TARGET_POSITION_GROUPS;
   });
 
   // 4. Form Templates
@@ -218,6 +253,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     let unsubUsers: (() => void) | undefined;
     let unsubGroups: (() => void) | undefined;
+    let unsubTargetGroups: (() => void) | undefined;
     let unsubTemplates: (() => void) | undefined;
     let unsubSubs: (() => void) | undefined;
     let unsubSettings: (() => void) | undefined;
@@ -241,8 +277,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             FORM_TEMPLATES,
             INITIAL_SUBMISSIONS,
             DEFAULT_SETTINGS,
-            GRADE_THRESHOLDS
+            GRADE_THRESHOLDS,
+            INITIAL_TARGET_POSITION_GROUPS
           );
+        } else {
+          // Check if remote roles need synchronization for Pratchya and Rannaphat
+          const pratchyaRemote = remoteUsers.find((u) => u.name.includes('ปรัชญา'));
+          const rannaphatRemote = remoteUsers.find((u) => u.name.includes('รัณย์ณภัทร'));
+          if ((pratchyaRemote && pratchyaRemote.role === 'admin') || (rannaphatRemote && rannaphatRemote.role !== 'admin')) {
+            console.log('Synchronizing swapped roles to Firebase Firestore...');
+            if (pratchyaRemote) {
+              await FirebaseService.saveUser({
+                ...pratchyaRemote,
+                role: 'evaluator',
+                position: 'ผู้อำนวยการชำนาญการพิเศษ (ประธานกรรมการอำนวยการ / คณะกรรมการ)',
+              });
+            }
+            if (rannaphatRemote) {
+              await FirebaseService.saveUser({
+                ...rannaphatRemote,
+                role: 'admin',
+                position: 'ครูชำนาญการ (ผู้ดูแลระบบ / Admin & กรรมการลงทะเบียนและรวบรวมคะแนน)',
+              });
+            }
+          }
         }
 
         // Setup real-time listeners for all models across all devices (PC, Android, iOS)
@@ -261,6 +319,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         unsubGroups = FirebaseService.listenCommitteeGroups((remoteGroups) => {
           if (remoteGroups && remoteGroups.length > 0) {
             setCommitteeGroups(remoteGroups);
+          }
+        });
+
+        unsubTargetGroups = FirebaseService.listenTargetPositionGroups((remoteTargetGroups) => {
+          if (remoteTargetGroups && remoteTargetGroups.length > 0) {
+            const needsUpgrade =
+              remoteTargetGroups.length < 3 ||
+              remoteTargetGroups.some(
+                (g) =>
+                  g.name.includes('กลุ่มที่ 1: ลูกจ้างชั่วคราว') ||
+                  g.name.includes('กลุ่มที่ 2: ลูกจ้างชั่วคราว') ||
+                  g.code?.includes('(ครูผู้ช่วย)') ||
+                  g.code?.includes('(จ้างเหมาบริการ)')
+              );
+            if (needsUpgrade) {
+              console.log('Upgrading target position groups to include Group 3 and updated clean names in Firebase...');
+              INITIAL_TARGET_POSITION_GROUPS.forEach((tg) => {
+                FirebaseService.saveTargetPositionGroup(tg).catch(console.error);
+              });
+              setTargetPositionGroups(INITIAL_TARGET_POSITION_GROUPS);
+            } else {
+              setTargetPositionGroups(remoteTargetGroups);
+            }
+          } else {
+            INITIAL_TARGET_POSITION_GROUPS.forEach((tg) => {
+              FirebaseService.saveTargetPositionGroup(tg).catch(console.error);
+            });
+            setTargetPositionGroups(INITIAL_TARGET_POSITION_GROUPS);
           }
         });
 
@@ -302,6 +388,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return () => {
       if (unsubUsers) unsubUsers();
       if (unsubGroups) unsubGroups();
+      if (unsubTargetGroups) unsubTargetGroups();
       if (unsubTemplates) unsubTemplates();
       if (unsubSubs) unsubSubs();
       if (unsubSettings) unsubSettings();
@@ -326,6 +413,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.GROUPS, JSON.stringify(committeeGroups));
   }, [committeeGroups]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.TARGET_GROUPS, JSON.stringify(targetPositionGroups));
+  }, [targetPositionGroups]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.TEMPLATES, JSON.stringify(formTemplates));
@@ -404,7 +495,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         formTemplates,
         submissions,
         systemSettings,
-        gradeThresholds
+        gradeThresholds,
+        targetPositionGroups
       );
       logAudit('FIREBASE_SYNC_ALL', 'ซิงค์ข้อมูลทั้งหมดขึ้นฐานข้อมูล Firebase สำเร็จ');
       setIsFirebaseConnected(true);
@@ -423,7 +515,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       (u) =>
         (u.username && u.username.toLowerCase() === trimmedUser) ||
         u.email.toLowerCase() === trimmedUser ||
-        u.id.toLowerCase() === trimmedUser
+        u.id.toLowerCase() === trimmedUser ||
+        (trimmedUser === 'admin' && (u.role === 'admin' || u.name.includes('รัณย์ณภัทร'))) ||
+        (trimmedUser === 'rannaphat' && u.name.includes('รัณย์ณภัทร')) ||
+        (trimmedUser === 'pratchya' && u.name.includes('ปรัชญา'))
     );
 
     if (!foundUser) {
@@ -628,6 +723,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     logAudit('DELETE_COMMITTEE_GROUP', `ลบกลุ่มคณะกรรมการรหัส: ${groupId}`);
   };
 
+  // Target Position Group (กลุ่มสายงานเป้าหมาย) CRUD
+  const addTargetPositionGroup = (groupData: Omit<TargetPositionGroup, 'id'>): TargetPositionGroup => {
+    const newId = 'target_grp_' + Date.now().toString(36);
+    const newGroup: TargetPositionGroup = {
+      ...groupData,
+      id: newId,
+      order: groupData.order || (targetPositionGroups.length + 1),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    setTargetPositionGroups((prev) => [...prev, newGroup]);
+    FirebaseService.saveTargetPositionGroup(newGroup).catch(console.error);
+    logAudit('CREATE_TARGET_POSITION_GROUP', `เพิ่มกลุ่มสายงานเป้าหมายใหม่: ${newGroup.name} (${newGroup.code})`);
+    return newGroup;
+  };
+
+  const updateTargetPositionGroup = (group: TargetPositionGroup) => {
+    const updated = { ...group, updatedAt: new Date().toISOString() };
+    setTargetPositionGroups((prev) => prev.map((g) => (g.id === group.id ? updated : g)));
+    FirebaseService.saveTargetPositionGroup(updated).catch(console.error);
+    logAudit('UPDATE_TARGET_POSITION_GROUP', `แก้ไข/เปลี่ยนชื่อกลุ่มสายงานเป้าหมาย: ${group.name} (${group.code})`);
+  };
+
+  const deleteTargetPositionGroup = (groupId: string) => {
+    const groupToDelete = targetPositionGroups.find((g) => g.id === groupId);
+    setTargetPositionGroups((prev) => prev.filter((g) => g.id !== groupId));
+    FirebaseService.deleteTargetPositionGroup(groupId).catch(console.error);
+    logAudit('DELETE_TARGET_POSITION_GROUP', `ลบกลุ่มสายงานเป้าหมาย: ${groupToDelete?.name || groupId}`);
+  };
+
   // User Management CRUD
   const addUser = (userData: Omit<User, 'id'>): User => {
     const newId = (userData.role === 'evaluator' ? 'evaluator_' : userData.role === 'admin' ? 'user_admin_' : 'staff_') + Date.now();
@@ -751,6 +876,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setCurrentUser(INITIAL_USERS[1]);
     setIsAuthenticated(true);
     setCommitteeGroups(INITIAL_COMMITTEE_GROUPS);
+    setTargetPositionGroups(INITIAL_TARGET_POSITION_GROUPS);
     setFormTemplates(FORM_TEMPLATES);
     setSubmissions(INITIAL_SUBMISSIONS);
     setGradeThresholds(GRADE_THRESHOLDS);
@@ -773,6 +899,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         resetSystemSettings,
         users,
         committeeGroups,
+        targetPositionGroups,
         formTemplates,
         gradeThresholds,
         submissions,
@@ -798,6 +925,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateCommitteeGroup,
         addCommitteeGroup,
         deleteCommitteeGroup,
+        addTargetPositionGroup,
+        updateTargetPositionGroup,
+        deleteTargetPositionGroup,
         addUser,
         updateUser,
         updateUserProfile,

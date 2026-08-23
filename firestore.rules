@@ -21,6 +21,11 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    // Target Position Groups (กลุ่มสายงานเป้าหมาย)
+    match /targetPositionGroups/{groupId} {
+      allow read, write: if true;
+    }
+
     // Form Templates
     match /formTemplates/{templateId} {
       allow read, write: if true;

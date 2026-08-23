@@ -1,4 +1,37 @@
-import { User, CommitteeGroup, GradeThreshold, EvaluationSubmission } from '../types';
+import { User, CommitteeGroup, GradeThreshold, EvaluationSubmission, TargetPositionGroup } from '../types';
+
+export const INITIAL_TARGET_POSITION_GROUPS: TargetPositionGroup[] = [
+  {
+    id: 'teacher_assistant',
+    name: 'กลุ่มที่ 1 : ตำแหน่ง ครูผู้ช่วย (ลูกจ้างชั่วคราว)',
+    code: 'กลุ่มที่ 1 : ตำแหน่ง ครูผู้ช่วย (ลูกจ้างชั่วคราว)',
+    description: 'กลุ่มสายงานวิชาการและการสอน ตำแหน่งครูผู้ช่วย (ลูกจ้างชั่วคราว)',
+    color: 'blue',
+    order: 1,
+    isDefault: true,
+    createdAt: '2026-04-01T00:00:00.000Z',
+  },
+  {
+    id: 'support_staff',
+    name: 'กลุ่มที่ 2 : จ้างเหมาบริการทุกตำแหน่ง',
+    code: 'กลุ่มที่ 2 : จ้างเหมาบริการทุกตำแหน่ง',
+    description: 'กลุ่มสายงานสนับสนุนการปฏิบัติงานและบริการ (จ้างเหมาบริการทุกตำแหน่ง)',
+    color: 'emerald',
+    order: 2,
+    isDefault: true,
+    createdAt: '2026-04-01T00:00:00.000Z',
+  },
+  {
+    id: 'government_employee_teacher',
+    name: 'กลุ่มที่ 3 : พนักงานราชการทั่วไป ตำแหน่ง ครูผู้สอน',
+    code: 'กลุ่มที่ 3 : พนักงานราชการทั่วไป ตำแหน่ง ครูผู้สอน',
+    description: 'กลุ่มสายงานวิชาการและการจัดการเรียนรู้ พนักงานราชการทั่วไป ตำแหน่ง ครูผู้สอน',
+    color: 'purple',
+    order: 3,
+    isDefault: true,
+    createdAt: '2026-04-01T00:00:00.000Z',
+  },
+];
 
 export const GRADE_THRESHOLDS: GradeThreshold[] = [
   {
@@ -36,22 +69,37 @@ export const GRADE_THRESHOLDS: GradeThreshold[] = [
 ];
 
 export const INITIAL_USERS: User[] = [
-  // 1. ผู้อำนวยการ / คณะกรรมการอำนวยการ
+  // 1. ผู้ดูแลระบบ (Admin)
   {
     id: 'user_admin_1',
-    name: 'นายปรัชญา สมณะช้างเผือก',
+    name: 'นางสาวรัณย์ณภัทร มากุญชร',
     username: 'admin',
     password: 'password123',
-    position: 'ผู้อำนวยการชำนาญการพิเศษ (ประธานกรรมการอำนวยการ)',
-    department: 'ผู้บริหารสถานศึกษา โรงเรียนศึกษาพิเศษชัยนาท',
+    position: 'ครูชำนาญการ (ผู้ดูแลระบบ / Admin & กรรมการลงทะเบียนและรวบรวมคะแนน)',
+    department: 'กลุ่มงานทะเบียนและประเมินผล',
     role: 'admin',
+    email: 'rannaphat.m@chainat-special.ac.th',
+    phone: '087-321-0987',
+    employeeCode: 'ADM-001',
+    avatarUrl: 'https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?auto=format&fit=crop&q=80&w=256',
+  },
+
+  // 2. ผู้อำนวยการ / คณะกรรมการอำนวยการ (Evaluator)
+  {
+    id: 'evaluator_director',
+    name: 'นายปรัชญา สมณะช้างเผือก',
+    username: 'pratchya',
+    password: 'password123',
+    position: 'ผู้อำนวยการชำนาญการพิเศษ (ประธานกรรมการอำนวยการ / คณะกรรมการ)',
+    department: 'ผู้บริหารสถานศึกษา โรงเรียนศึกษาพิเศษชัยนาท',
+    role: 'evaluator',
     email: 'director@chainat-special.ac.th',
     phone: '056-411-xxx',
     employeeCode: 'DIR-001',
     avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=256',
   },
 
-  // 2. คณะกรรมการประเมินผลการปฏิบัติงาน ชุดที่ 1
+  // 3. คณะกรรมการประเมินผลการปฏิบัติงาน ชุดที่ 1
   // คำสั่งที่ 251/2569
   {
     id: 'evaluator_1',
@@ -96,7 +144,7 @@ export const INITIAL_USERS: User[] = [
     avatarUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=256',
   },
 
-  // 3. คณะกรรมการประเมินผลการปฏิบัติงาน ชุดที่ 2
+  // 4. คณะกรรมการประเมินผลการปฏิบัติงาน ชุดที่ 2
   // คำสั่งที่ 251/2569
   {
     id: 'evaluator_4',
@@ -139,21 +187,6 @@ export const INITIAL_USERS: User[] = [
     phone: '086-432-1098',
     employeeCode: 'EV-203',
     avatarUrl: 'https://images.unsplash.com/photo-1567532939604-b6b5b0db2604?auto=format&fit=crop&q=80&w=256',
-  },
-
-  // 4. คณะกรรมการลงทะเบียนและรวบรวมคะแนน
-  {
-    id: 'evaluator_7',
-    name: 'นางสาวรัณย์ณภัทร มากุญชร',
-    username: 'rannaphat',
-    password: 'password123',
-    position: 'ครูชำนาญการ (กรรมการและเลขานุการ คณะกรรมการลงทะเบียนและรวบรวมคะแนน)',
-    department: 'กลุ่มงานทะเบียนและประเมินผล',
-    role: 'evaluator',
-    email: 'rannaphat.m@chainat-special.ac.th',
-    phone: '087-321-0987',
-    employeeCode: 'EV-302',
-    avatarUrl: 'https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?auto=format&fit=crop&q=80&w=256',
   },
 
   // 5. ผู้รับการประเมิน (ลูกจ้างชั่วคราว ตำแหน่งครูผู้ช่วย 13 ท่าน และ จ้างเหมาบริการ 12 ตำแหน่ง)

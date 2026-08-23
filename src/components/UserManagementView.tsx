@@ -20,13 +20,16 @@ import {
   Sparkles,
   Lock,
   UserCheck,
+  Layers,
 } from 'lucide-react';
 import { User, UserRole, PositionGroup } from '../types';
 import { STANDARD_POSITIONS_13 } from '../data/formTemplates';
+import { TargetPositionGroupModal } from './TargetPositionGroupModal';
 
 export const UserManagementView: React.FC = () => {
   const {
     users,
+    targetPositionGroups,
     addUser,
     updateUser,
     deleteUser,
@@ -37,7 +40,8 @@ export const UserManagementView: React.FC = () => {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState<'all' | UserRole>('all');
-  const [groupFilter, setGroupFilter] = useState<'all' | PositionGroup>('all');
+  const [groupFilter, setGroupFilter] = useState<'all' | string>('all');
+  const [isTargetModalOpen, setIsTargetModalOpen] = useState(false);
 
   // Modals state
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -217,6 +221,17 @@ export const UserManagementView: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            id="btn-manage-target-groups-user-view"
+            onClick={() => setIsTargetModalOpen(true)}
+            className="flex items-center justify-center gap-2 px-3.5 py-2.5 bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-700 rounded-xl font-bold text-xs sm:text-sm border border-slate-200 transition cursor-pointer"
+            title="เปลี่ยนชื่อ เพิ่ม ลบ แก้ไข กลุ่มสายงานเป้าหมาย"
+          >
+            <Layers className="w-4 h-4 text-blue-600" />
+            <span>กลุ่มสายงาน ({targetPositionGroups.length})</span>
+          </button>
+
           <button
             type="button"
             onClick={handleOpenAddModal}
@@ -523,15 +538,18 @@ export const UserManagementView: React.FC = () => {
                 {formData.role === 'staff' && (
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">
-                      กลุ่มตำแหน่งงาน
+                      กลุ่มสายงานเป้าหมาย
                     </label>
                     <select
                       value={formData.positionGroup}
                       onChange={(e) => setFormData({ ...formData, positionGroup: e.target.value as PositionGroup })}
                       className="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20 outline-none bg-white"
                     >
-                      <option value="teacher_assistant">กลุ่ม 1: ลูกจ้างชั่วคราว ครูผู้ช่วย</option>
-                      <option value="support_staff">กลุ่ม 2: สายสนับสนุน (12 ตำแหน่ง)</option>
+                      {targetPositionGroups.map((tg) => (
+                        <option key={tg.id} value={tg.id}>
+                          {tg.name}
+                        </option>
+                      ))}
                     </select>
                   </div>
                 )}
@@ -695,6 +713,25 @@ export const UserManagementView: React.FC = () => {
                 </div>
               </div>
 
+              {formData.role === 'staff' && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    กลุ่มสายงานเป้าหมาย
+                  </label>
+                  <select
+                    value={formData.positionGroup}
+                    onChange={(e) => setFormData({ ...formData, positionGroup: e.target.value as PositionGroup })}
+                    className="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl focus:border-blue-600 outline-none bg-white"
+                  >
+                    {targetPositionGroups.map((tg) => (
+                      <option key={tg.id} value={tg.id}>
+                        {tg.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
                   ตำแหน่งงาน
@@ -840,6 +877,12 @@ export const UserManagementView: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Target Position Group Modal */}
+      <TargetPositionGroupModal
+        isOpen={isTargetModalOpen}
+        onClose={() => setIsTargetModalOpen(false)}
+      />
 
     </div>
   );

@@ -28,6 +28,20 @@
         "assignedEvaluateeIds": { "type": "array" }
       }
     },
+    "TargetPositionGroup": {
+      "title": "TargetPositionGroup",
+      "description": "Target job position category group configuration",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "code": { "type": "string" },
+        "description": { "type": "string" },
+        "color": { "type": "string" },
+        "order": { "type": "number" },
+        "isDefault": { "type": "boolean" }
+      }
+    },
     "FormTemplate": {
       "title": "FormTemplate",
       "description": "Evaluation rubric template for position",
@@ -108,6 +122,10 @@
     "/committeeGroups/{groupId}": {
       "schema": "CommitteeGroup",
       "description": "Evaluation committee groups"
+    },
+    "/targetPositionGroups/{groupId}": {
+      "schema": "TargetPositionGroup",
+      "description": "Target job position categories"
     },
     "/formTemplates/{templateId}": {
       "schema": "FormTemplate",

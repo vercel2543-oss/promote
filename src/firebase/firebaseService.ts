@@ -22,11 +22,13 @@ import {
   SystemSettings,
   AuditLog,
   GradeThreshold,
+  TargetPositionGroup,
 } from '../types';
 
 // Collection References
 const USERS_COLLECTION = 'users';
 const GROUPS_COLLECTION = 'committeeGroups';
+const TARGET_GROUPS_COLLECTION = 'targetPositionGroups';
 const TEMPLATES_COLLECTION = 'formTemplates';
 const SUBMISSIONS_COLLECTION = 'submissions';
 const SETTINGS_COLLECTION = 'systemSettings';
@@ -168,6 +170,54 @@ export const FirebaseService = {
       },
       (error) => {
         console.error('Error listening to groups:', error);
+      }
+    );
+  },
+
+  // ----------------------------------------------------
+  // Target Position Groups (กลุ่มสายงานเป้าหมาย)
+  // ----------------------------------------------------
+  async getTargetPositionGroups(): Promise<TargetPositionGroup[]> {
+    try {
+      const snapshot = await getDocs(collection(db, TARGET_GROUPS_COLLECTION));
+      return snapshot.docs.map((d) => d.data() as TargetPositionGroup);
+    } catch (error) {
+      console.error('Error fetching target position groups from Firebase:', error);
+      return [];
+    }
+  },
+
+  async saveTargetPositionGroup(group: TargetPositionGroup): Promise<void> {
+    try {
+      const docRef = doc(db, TARGET_GROUPS_COLLECTION, group.id);
+      await setDoc(docRef, { ...group, updatedAt: new Date().toISOString() }, { merge: true });
+    } catch (error) {
+      console.error('Error saving target position group to Firebase:', error);
+      throw error;
+    }
+  },
+
+  async deleteTargetPositionGroup(groupId: string): Promise<void> {
+    try {
+      await deleteDoc(doc(db, TARGET_GROUPS_COLLECTION, groupId));
+    } catch (error) {
+      console.error('Error deleting target position group from Firebase:', error);
+      throw error;
+    }
+  },
+
+  listenTargetPositionGroups(callback: (groups: TargetPositionGroup[]) => void) {
+    return onSnapshot(
+      collection(db, TARGET_GROUPS_COLLECTION),
+      (snapshot) => {
+        const groups = snapshot.docs.map((d) => d.data() as TargetPositionGroup);
+        if (groups.length > 0) {
+          groups.sort((a, b) => (a.order || 99) - (b.order || 99));
+          callback(groups);
+        }
+      },
+      (error) => {
+        console.error('Error listening to target position groups:', error);
       }
     );
   },
@@ -339,7 +389,8 @@ export const FirebaseService = {
     templates: FormTemplate[],
     submissions: EvaluationSubmission[],
     settings: SystemSettings,
-    thresholds?: GradeThreshold[]
+    thresholds?: GradeThreshold[],
+    targetGroups?: TargetPositionGroup[]
   ): Promise<void> {
     try {
       const batch = writeBatch(db);
@@ -359,6 +410,14 @@ export const FirebaseService = {
         const gRef = doc(db, GROUPS_COLLECTION, group.id);
         batch.set(gRef, group);
       });
+
+      // 3.1 Target Position Groups
+      if (targetGroups && targetGroups.length > 0) {
+        targetGroups.forEach((tg) => {
+          const tgRef = doc(db, TARGET_GROUPS_COLLECTION, tg.id);
+          batch.set(tgRef, tg);
+        });
+      }
 
       // 4. Templates
       templates.forEach((tmpl) => {
