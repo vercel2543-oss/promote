@@ -32,6 +32,7 @@ export interface User {
   groupId?: string; // ID of assigned committee group
   phone?: string;
   employeeCode?: string; // รหัสพนักงาน
+  formTemplateId?: string; // รหัสแบบฟอร์มการประเมินที่กำหนดเฉพาะบุคคล (Assigned Evaluation Form Template ID)
 }
 
 export interface CommitteeGroup {

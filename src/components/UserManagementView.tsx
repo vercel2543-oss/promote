@@ -21,15 +21,20 @@ import {
   Lock,
   UserCheck,
   Layers,
+  FileText,
+  FileSpreadsheet,
+  Check,
 } from 'lucide-react';
 import { User, UserRole, PositionGroup } from '../types';
 import { STANDARD_POSITIONS_13 } from '../data/formTemplates';
 import { TargetPositionGroupModal } from './TargetPositionGroupModal';
+import { getFormTemplateForUser } from '../utils/evaluationCalculator';
 
 export const UserManagementView: React.FC = () => {
   const {
     users,
     targetPositionGroups,
+    formTemplates,
     addUser,
     updateUser,
     deleteUser,
@@ -62,9 +67,11 @@ export const UserManagementView: React.FC = () => {
     email: '',
     phone: '',
     employeeCode: '',
+    formTemplateId: 'form_support_laborer',
   });
 
   const resetForm = () => {
+    const defaultForm = formTemplates[0]?.id || 'form_teacher_assistant';
     setFormData({
       name: '',
       username: '',
@@ -76,6 +83,7 @@ export const UserManagementView: React.FC = () => {
       email: '',
       phone: '',
       employeeCode: '',
+      formTemplateId: defaultForm,
     });
   };
 
@@ -85,6 +93,7 @@ export const UserManagementView: React.FC = () => {
   };
 
   const handleOpenEditModal = (user: User) => {
+    const defaultForm = getFormTemplateForUser(user, formTemplates);
     setEditingUser(user);
     setFormData({
       name: user.name,
@@ -97,6 +106,7 @@ export const UserManagementView: React.FC = () => {
       email: user.email || '',
       phone: user.phone || '',
       employeeCode: user.employeeCode || '',
+      formTemplateId: user.formTemplateId || defaultForm.id,
     });
   };
 
@@ -115,6 +125,7 @@ export const UserManagementView: React.FC = () => {
       email: formData.email || `${formData.username || 'user'}@school.ac.th`,
       phone: formData.phone,
       employeeCode: formData.employeeCode,
+      formTemplateId: formData.role === 'staff' ? formData.formTemplateId : undefined,
     });
 
     setIsAddModalOpen(false);
@@ -137,6 +148,7 @@ export const UserManagementView: React.FC = () => {
       email: formData.email,
       phone: formData.phone,
       employeeCode: formData.employeeCode,
+      formTemplateId: formData.role === 'staff' ? formData.formTemplateId : undefined,
     });
 
     setEditingUser(null);
@@ -390,6 +402,21 @@ export const UserManagementView: React.FC = () => {
                       <span>{user.phone}</span>
                     </div>
                   )}
+
+                  {user.role === 'staff' && (() => {
+                    const assignedForm = getFormTemplateForUser(user, formTemplates);
+                    return (
+                      <div className="mt-2 pt-2 border-t border-slate-200/60 flex items-center justify-between gap-1.5 text-[11px] text-indigo-700 bg-indigo-50/60 px-2.5 py-1.5 rounded-lg border border-indigo-100/80">
+                        <div className="flex items-center gap-1.5 truncate">
+                          <FileSpreadsheet className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                          <span className="font-semibold truncate">แบบประเมิน: [{assignedForm.code}] {assignedForm.positionTitle}</span>
+                        </div>
+                        <span className="text-[10px] bg-white text-indigo-800 font-bold px-1.5 py-0.5 rounded shadow-2xs shrink-0">
+                          {assignedForm.totalMaxScore} คะแนน
+                        </span>
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
 
@@ -542,7 +569,15 @@ export const UserManagementView: React.FC = () => {
                     </label>
                     <select
                       value={formData.positionGroup}
-                      onChange={(e) => setFormData({ ...formData, positionGroup: e.target.value as PositionGroup })}
+                      onChange={(e) => {
+                        const newGrp = e.target.value as PositionGroup;
+                        const matchingTemplate = formTemplates.find((t) => t.group === newGrp);
+                        setFormData({
+                          ...formData,
+                          positionGroup: newGrp,
+                          formTemplateId: matchingTemplate ? matchingTemplate.id : formData.formTemplateId,
+                        });
+                      }}
                       className="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20 outline-none bg-white"
                     >
                       {targetPositionGroups.map((tg) => (
@@ -554,6 +589,79 @@ export const UserManagementView: React.FC = () => {
                   </div>
                 )}
               </div>
+
+              {formData.role === 'staff' && (
+                <div className="bg-indigo-50/70 border border-indigo-200 rounded-2xl p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <FileSpreadsheet className="w-4 h-4 text-indigo-700" />
+                      <label className="text-xs font-bold text-indigo-950">
+                        แบบฟอร์มที่ใช้ในการประเมิน (Evaluation Form Template)
+                      </label>
+                    </div>
+                    <span className="text-[11px] font-bold bg-indigo-100 text-indigo-800 px-2.5 py-0.5 rounded-full border border-indigo-200">
+                      แบบประเมินเฉพาะบุคคล
+                    </span>
+                  </div>
+
+                  <select
+                    value={formData.formTemplateId}
+                    onChange={(e) => setFormData({ ...formData, formTemplateId: e.target.value })}
+                    className="w-full px-3 py-2.5 text-xs sm:text-sm border border-indigo-300 rounded-xl focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/20 outline-none bg-white font-medium text-slate-900"
+                  >
+                    <optgroup label="กลุ่มที่ 1: ครูผู้ช่วย (ลูกจ้างชั่วคราว)">
+                      {formTemplates
+                        .filter((t) => t.group === 'teacher_assistant')
+                        .map((t) => (
+                          <option key={t.id} value={t.id}>
+                            [{t.code}] {t.title} ({t.totalMaxScore} คะแนน)
+                          </option>
+                        ))}
+                    </optgroup>
+                    <optgroup label="กลุ่มที่ 2: สายสนับสนุน/ปฏิบัติงาน (12 ตำแหน่ง)">
+                      {formTemplates
+                        .filter((t) => t.group === 'support_staff')
+                        .map((t) => (
+                          <option key={t.id} value={t.id}>
+                            [{t.code}] {t.title} ({t.totalMaxScore} คะแนน)
+                          </option>
+                        ))}
+                    </optgroup>
+                    {formTemplates.some((t) => t.group !== 'teacher_assistant' && t.group !== 'support_staff') && (
+                      <optgroup label="แบบฟอร์มอื่นๆ">
+                        {formTemplates
+                          .filter((t) => t.group !== 'teacher_assistant' && t.group !== 'support_staff')
+                          .map((t) => (
+                            <option key={t.id} value={t.id}>
+                              [{t.code}] {t.title} ({t.totalMaxScore} คะแนน)
+                            </option>
+                          ))}
+                      </optgroup>
+                    )}
+                  </select>
+
+                  {/* Template Info Card */}
+                  {(() => {
+                    const currentSelectedTmpl = formTemplates.find((t) => t.id === formData.formTemplateId);
+                    if (!currentSelectedTmpl) return null;
+                    return (
+                      <div className="bg-white/90 border border-indigo-100 rounded-xl p-3 text-xs text-slate-600 space-y-1.5 shadow-2xs">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-indigo-900">
+                            รหัส {currentSelectedTmpl.code}: {currentSelectedTmpl.positionTitle}
+                          </span>
+                          <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                            คะแนนเต็ม {currentSelectedTmpl.totalMaxScore} คะแนน ({currentSelectedTmpl.categories?.length || 0} ตอน)
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 line-clamp-2 leading-relaxed">
+                          {currentSelectedTmpl.description || currentSelectedTmpl.title}
+                        </p>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
@@ -720,7 +828,15 @@ export const UserManagementView: React.FC = () => {
                   </label>
                   <select
                     value={formData.positionGroup}
-                    onChange={(e) => setFormData({ ...formData, positionGroup: e.target.value as PositionGroup })}
+                    onChange={(e) => {
+                      const newGrp = e.target.value as PositionGroup;
+                      const matchingTemplate = formTemplates.find((t) => t.group === newGrp);
+                      setFormData({
+                        ...formData,
+                        positionGroup: newGrp,
+                        formTemplateId: matchingTemplate ? matchingTemplate.id : formData.formTemplateId,
+                      });
+                    }}
                     className="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl focus:border-blue-600 outline-none bg-white"
                   >
                     {targetPositionGroups.map((tg) => (
@@ -729,6 +845,88 @@ export const UserManagementView: React.FC = () => {
                       </option>
                     ))}
                   </select>
+                </div>
+              )}
+
+              {formData.role === 'staff' && (
+                <div className="bg-gradient-to-br from-indigo-50/90 via-blue-50/70 to-slate-50 border-2 border-indigo-200 rounded-2xl p-4 sm:p-5 space-y-3 shadow-xs">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <FileSpreadsheet className="w-4 h-4 text-indigo-700" />
+                      <label className="text-xs sm:text-sm font-bold text-indigo-950">
+                        แบบฟอร์มที่ใช้ในการประเมิน (Evaluation Form Template)
+                      </label>
+                    </div>
+                    <span className="text-[11px] font-bold bg-indigo-100 text-indigo-800 px-2.5 py-0.5 rounded-full border border-indigo-200">
+                      แอดมินเปลี่ยนแบบฟอร์มได้
+                    </span>
+                  </div>
+
+                  <p className="text-[11px] text-slate-500">
+                    ดึงแบบฟอร์มปัจจุบันที่ผูกกับผู้รับการประเมินนี้ สามารถเลือกเปลี่ยนแบบฟอร์มอื่นได้ตามต้องการ:
+                  </p>
+
+                  <select
+                    value={formData.formTemplateId}
+                    onChange={(e) => setFormData({ ...formData, formTemplateId: e.target.value })}
+                    className="w-full px-3 py-2.5 text-xs sm:text-sm border border-indigo-300 rounded-xl focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/20 outline-none bg-white font-semibold text-slate-900 shadow-2xs"
+                  >
+                    <optgroup label="กลุ่มที่ 1: ครูผู้ช่วย (ลูกจ้างชั่วคราว)">
+                      {formTemplates
+                        .filter((t) => t.group === 'teacher_assistant')
+                        .map((t) => (
+                          <option key={t.id} value={t.id}>
+                            [{t.code}] {t.title} ({t.totalMaxScore} คะแนน)
+                          </option>
+                        ))}
+                    </optgroup>
+                    <optgroup label="กลุ่มที่ 2: สายสนับสนุน/ปฏิบัติงาน (12 ตำแหน่ง)">
+                      {formTemplates
+                        .filter((t) => t.group === 'support_staff')
+                        .map((t) => (
+                          <option key={t.id} value={t.id}>
+                            [{t.code}] {t.title} ({t.totalMaxScore} คะแนน)
+                          </option>
+                        ))}
+                    </optgroup>
+                    {formTemplates.some((t) => t.group !== 'teacher_assistant' && t.group !== 'support_staff') && (
+                      <optgroup label="แบบฟอร์มอื่นๆ">
+                        {formTemplates
+                          .filter((t) => t.group !== 'teacher_assistant' && t.group !== 'support_staff')
+                          .map((t) => (
+                            <option key={t.id} value={t.id}>
+                              [{t.code}] {t.title} ({t.totalMaxScore} คะแนน)
+                            </option>
+                          ))}
+                      </optgroup>
+                    )}
+                  </select>
+
+                  {/* Live Template Info Card Preview */}
+                  {(() => {
+                    const currentSelectedTmpl = formTemplates.find((t) => t.id === formData.formTemplateId);
+                    if (!currentSelectedTmpl) return null;
+                    return (
+                      <div className="bg-white rounded-xl p-3.5 border border-indigo-100/90 text-xs text-slate-600 space-y-2 shadow-2xs">
+                        <div className="flex flex-wrap items-center justify-between gap-1.5 pb-2 border-b border-slate-100">
+                          <span className="font-bold text-indigo-900 flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-indigo-600"></span>
+                            รหัส {currentSelectedTmpl.code}: {currentSelectedTmpl.positionTitle}
+                          </span>
+                          <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                            คะแนนเต็ม {currentSelectedTmpl.totalMaxScore} คะแนน ({currentSelectedTmpl.categories?.length || 0} ตอน)
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 leading-relaxed">
+                          {currentSelectedTmpl.description || currentSelectedTmpl.title}
+                        </p>
+                        <div className="flex items-center gap-1 text-[11px] text-indigo-600 font-medium pt-1">
+                          <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                          <span>แบบฟอร์มนี้จะมีผลทันทีต่อการประเมินและการคำนวณคะแนนของ {formData.name || 'ผู้รับการประเมิน'}</span>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
 

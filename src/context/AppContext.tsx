@@ -18,7 +18,7 @@ import {
   INITIAL_TARGET_POSITION_GROUPS,
 } from '../data/initialData';
 import { FORM_TEMPLATES } from '../data/formTemplates';
-import { calculateAggregatedResult } from '../utils/evaluationCalculator';
+import { calculateAggregatedResult, getFormTemplateForUser } from '../utils/evaluationCalculator';
 import { CHAINAT_SCHOOL_LOGO } from '../data/presetLogos';
 import { FirebaseService } from '../firebase/firebaseService';
 
@@ -450,12 +450,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         committeeGroups.find((g) => g.assignedEvaluateeIds.includes(evaluatee.id)) ||
         committeeGroups[0];
 
-      const matchingForm =
-        formTemplates.find(
-          (t) =>
-            evaluatee.position.includes(t.positionTitle) ||
-            t.positionTitle.includes(evaluatee.position)
-        ) || formTemplates[0];
+      const matchingForm = getFormTemplateForUser(evaluatee, formTemplates);
 
       const agg = calculateAggregatedResult(
         evaluatee,

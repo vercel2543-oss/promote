@@ -206,3 +206,59 @@ export function exportToCSV(aggregatedResults: AggregatedResult[], filename = 'p
   link.click();
   document.body.removeChild(link);
 }
+
+/**
+ * Helper to resolve the appropriate form template for a user / evaluatee
+ */
+export function getFormTemplateForUser(
+  user: User | undefined | null,
+  templates: FormTemplate[]
+): FormTemplate {
+  if (!templates || templates.length === 0) {
+    return {
+      id: 'form_default',
+      code: 'DEFAULT',
+      group: 'teacher_assistant',
+      title: 'แบบประเมินผลการปฏิบัติงาน',
+      positionTitle: 'ทั่วไป',
+      description: '',
+      categories: [],
+      totalMaxScore: 100,
+    };
+  }
+
+  if (!user) return templates[0];
+
+  // 1. Explicitly assigned form template ID
+  if (user.formTemplateId) {
+    const found = templates.find((t) => t.id === user.formTemplateId);
+    if (found) return found;
+  }
+
+  // 2. Exact or substring match in positionTitle or code
+  const cleanPos = (user.position || '').trim().toLowerCase();
+
+  // Specific check for ครูผู้ช่วย
+  if (cleanPos.includes('ครูผู้ช่วย')) {
+    const teacherTemplate = templates.find(
+      (t) => t.id === 'form_teacher_assistant' || t.code === 'T-01' || t.positionTitle.includes('ครูผู้ช่วย')
+    );
+    if (teacherTemplate) return teacherTemplate;
+  }
+
+  // Match by position title
+  const matchingByPos = templates.find(
+    (t) =>
+      cleanPos.includes(t.positionTitle.toLowerCase()) ||
+      t.positionTitle.toLowerCase().includes(cleanPos)
+  );
+  if (matchingByPos) return matchingByPos;
+
+  // 3. Fallback by positionGroup
+  if (user.positionGroup) {
+    const matchingByGroup = templates.find((t) => t.group === user.positionGroup);
+    if (matchingByGroup) return matchingByGroup;
+  }
+
+  return templates[0];
+}
