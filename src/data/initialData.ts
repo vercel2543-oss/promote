@@ -73,15 +73,16 @@ export const INITIAL_USERS: User[] = [
   {
     id: 'user_admin_1',
     name: 'นางสาวรัณย์ณภัทร มากุญชร',
-    username: 'admin',
+    username: 'rannaphat',
     password: 'password123',
     position: 'ครูชำนาญการ (ผู้ดูแลระบบ / Admin & กรรมการลงทะเบียนและรวบรวมคะแนน)',
     department: 'กลุ่มงานทะเบียนและประเมินผล',
     role: 'admin',
     email: 'rannaphat.m@chainat-special.ac.th',
     phone: '087-321-0987',
-    employeeCode: 'ADM-001',
+    employeeCode: 'EV-302',
     avatarUrl: 'https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?auto=format&fit=crop&q=80&w=256',
+    avatar: 'https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?auto=format&fit=crop&q=80&w=256',
   },
 
   // 2. ผู้อำนวยการ / คณะกรรมการอำนวยการ (Evaluator)
@@ -97,6 +98,7 @@ export const INITIAL_USERS: User[] = [
     phone: '056-411-xxx',
     employeeCode: 'DIR-001',
     avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=256',
+    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=256',
   },
 
   // 3. คณะกรรมการประเมินผลการปฏิบัติงาน ชุดที่ 1
@@ -106,7 +108,7 @@ export const INITIAL_USERS: User[] = [
     name: 'นางสาวอรวรรณ พงษ์ศิริ',
     username: 'orawan',
     password: 'password123',
-    position: 'รองผู้อำนวยการชำนาญการพิเศษ (ประธานกรรมการ ชุดที่ 1)',
+    position: 'รองผู้อำนวยการสถานศึกษา (ประธานกรรมการ ชุดที่ 1)',
     department: 'ฝ่ายบริหารงานวิชาการและบุคคล',
     role: 'evaluator',
     groupId: 'group_1',
@@ -114,6 +116,7 @@ export const INITIAL_USERS: User[] = [
     phone: '081-987-6543',
     employeeCode: 'EV-101',
     avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=256',
+    avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=256',
   },
   {
     id: 'evaluator_2',

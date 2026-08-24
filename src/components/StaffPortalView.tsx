@@ -41,8 +41,12 @@ export const StaffPortalView: React.FC<StaffPortalViewProps> = ({ onOpenReport }
         <div className="absolute right-0 top-0 translate-x-10 -translate-y-10 w-64 h-64 bg-white/5 rounded-full blur-2xl pointer-events-none"></div>
         <div className="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
           <div className="flex items-start gap-4">
-            <div className="w-16 h-16 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center font-bold text-2xl text-amber-300 shadow-inner">
-              {currentUser.name.charAt(0)}
+            <div className="w-16 h-16 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center font-bold text-2xl text-amber-300 shadow-inner overflow-hidden shrink-0">
+              {(currentUser.avatar || currentUser.avatarUrl) ? (
+                <img src={currentUser.avatar || currentUser.avatarUrl} alt={currentUser.name} className="w-full h-full object-cover" />
+              ) : (
+                currentUser.name.charAt(0)
+              )}
             </div>
             <div>
               <div className="flex items-center gap-2">

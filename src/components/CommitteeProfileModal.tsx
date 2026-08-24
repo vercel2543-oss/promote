@@ -16,6 +16,7 @@ import {
   Layers,
   Sparkles,
 } from 'lucide-react';
+import { compressAndResizeImage } from '../utils/imageUtils';
 
 interface CommitteeProfileModalProps {
   isOpen: boolean;
@@ -51,19 +52,21 @@ export const CommitteeProfileModal: React.FC<CommitteeProfileModalProps> = ({
   const assignedGroup = committeeGroups.find((g) => g.evaluatorIds.includes(currentUser.id));
   const myCompletedCount = submissions.filter((s) => s.evaluatorId === currentUser.id).length;
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const [isUploading, setIsUploading] = useState(false);
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 3 * 1024 * 1024) {
-        alert('กรุณาเลือกไฟล์ภาพที่มีขนาดไม่เกิน 3MB');
-        return;
+      try {
+        setIsUploading(true);
+        const compressed = await compressAndResizeImage(file, 480, 480, 0.85);
+        setFormData((prev) => ({ ...prev, avatarUrl: compressed }));
+      } catch (err) {
+        console.error('Image upload failed:', err);
+        alert('เกิดข้อผิดพลาดในการโหลดรูปภาพ กรุณาลองใหม่อีกครั้ง');
+      } finally {
+        setIsUploading(false);
       }
-      const reader = new FileReader();
-      reader.onload = () => {
-        const result = reader.result as string;
-        setFormData((prev) => ({ ...prev, avatarUrl: result }));
-      };
-      reader.readAsDataURL(file);
     }
   };
 
@@ -80,6 +83,7 @@ export const CommitteeProfileModal: React.FC<CommitteeProfileModalProps> = ({
       email: formData.email,
       phone: formData.phone,
       avatarUrl: formData.avatarUrl,
+      avatar: formData.avatarUrl,
     });
     setIsSaved(true);
     setTimeout(() => {

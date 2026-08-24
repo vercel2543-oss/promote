@@ -35,6 +35,7 @@ import { User, UserRole, PositionGroup, LeaveStats } from '../types';
 import { STANDARD_POSITIONS_13 } from '../data/formTemplates';
 import { TargetPositionGroupModal } from './TargetPositionGroupModal';
 import { getFormTemplateForUser } from '../utils/evaluationCalculator';
+import { compressAndResizeImage } from '../utils/imageUtils';
 
 const defaultLeaveStats: LeaveStats = {
   late: { days: 0, times: 0 },
@@ -57,20 +58,16 @@ interface AvatarPickerProps {
 const AvatarPicker: React.FC<AvatarPickerProps> = ({ avatar, onChange, role, name }) => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 2 * 1024 * 1024) {
-        alert('ขนาดไฟล์รูปภาพต้องไม่เกิน 2MB');
-        return;
+      try {
+        const compressed = await compressAndResizeImage(file, 480, 480, 0.85);
+        onChange(compressed);
+      } catch (err) {
+        console.error('Failed to compress avatar:', err);
+        alert('เกิดข้อผิดพลาดในการประมวลผลรูปภาพ');
       }
-      const reader = new FileReader();
-      reader.onload = () => {
-        if (typeof reader.result === 'string') {
-          onChange(reader.result);
-        }
-      };
-      reader.readAsDataURL(file);
     }
   };
 

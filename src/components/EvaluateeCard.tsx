@@ -229,9 +229,9 @@ export const EvaluateeCard: React.FC<EvaluateeCardProps> = ({
                       <div className="flex items-center gap-2 min-w-0">
                         {/* Evaluator Avatar */}
                         <div className="w-6 h-6 rounded-full bg-teal-100 text-teal-800 flex items-center justify-center text-[10px] font-bold shrink-0 overflow-hidden">
-                          {evaluator.avatarUrl ? (
+                          {(evaluator.avatar || evaluator.avatarUrl) ? (
                             <img
-                              src={evaluator.avatarUrl}
+                              src={evaluator.avatar || evaluator.avatarUrl}
                               alt={evaluator.name}
                               className="w-full h-full object-cover"
                             />
@@ -278,9 +278,9 @@ export const EvaluateeCard: React.FC<EvaluateeCardProps> = ({
                     <div className="flex items-center gap-2 min-w-0">
                       {/* Evaluator Avatar Placeholder */}
                       <div className="w-6 h-6 rounded-full bg-slate-200 text-slate-500 flex items-center justify-center text-[10px] font-bold shrink-0 overflow-hidden">
-                        {evaluator.avatarUrl ? (
+                        {(evaluator.avatar || evaluator.avatarUrl) ? (
                           <img
-                            src={evaluator.avatarUrl}
+                            src={evaluator.avatar || evaluator.avatarUrl}
                             alt={evaluator.name}
                             className="w-full h-full object-cover grayscale opacity-70"
                           />

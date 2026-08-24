@@ -219,8 +219,12 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                           }`}
                         >
                           <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-purple-600 text-white flex items-center justify-center font-bold text-sm shadow-xs group-hover:scale-105 transition">
-                              {user.name.charAt(0)}
+                            <div className="w-10 h-10 rounded-xl bg-purple-600 text-white flex items-center justify-center font-bold text-sm shadow-xs group-hover:scale-105 transition overflow-hidden">
+                              {(user.avatar || user.avatarUrl) ? (
+                                <img src={user.avatar || user.avatarUrl} alt={user.name} className="w-full h-full object-cover" />
+                              ) : (
+                                user.name.charAt(0)
+                              )}
                             </div>
                             <div>
                               <div className="text-sm font-bold text-slate-900 flex items-center gap-2">
@@ -268,8 +272,12 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                           }`}
                         >
                           <div className="flex items-center gap-2.5 min-w-0">
-                            <div className="w-9 h-9 shrink-0 rounded-xl bg-blue-700 text-white flex items-center justify-center font-bold text-xs shadow-xs group-hover:scale-105 transition">
-                              {user.name.charAt(0)}
+                            <div className="w-9 h-9 shrink-0 rounded-xl bg-blue-700 text-white flex items-center justify-center font-bold text-xs shadow-xs group-hover:scale-105 transition overflow-hidden">
+                              {(user.avatar || user.avatarUrl) ? (
+                                <img src={user.avatar || user.avatarUrl} alt={user.name} className="w-full h-full object-cover" />
+                              ) : (
+                                user.name.charAt(0)
+                              )}
                             </div>
                             <div className="min-w-0">
                               <div className="text-xs font-bold text-slate-900 truncate">{user.name}</div>

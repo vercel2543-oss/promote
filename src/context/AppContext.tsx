@@ -45,6 +45,112 @@ export const DEFAULT_SETTINGS: SystemSettings = {
   evaluationRound: 'การประเมินผลการปฏิบัติงาน ปีงบประมาณ 2569 (คำสั่งที่ 251/2569 และ 252/2569)',
 };
 
+/**
+ * Sanitizes and repairs users to guarantee:
+ * 1. Exactly 1 Admin: นางสาวรัณย์ณภัทร มากุญชร (rannaphat, EV-302)
+ * 2. นางสาวอรวรรณ พงษ์ศิริ (orawan, EV-101) is strictly Evaluator / Deputy Director
+ * 3. All users have synchronized avatar and avatarUrl fields
+ */
+export function sanitizeAndFixUsers(rawUsers: User[]): { sanitized: User[]; hasChanged: boolean } {
+  let hasChanged = false;
+  const userMap = new Map<string, User>();
+
+  for (const raw of rawUsers) {
+    let u = { ...raw };
+
+    // 1. Identify and fix orawan (EV-101 / evaluator_1)
+    if (
+      u.id === 'evaluator_1' ||
+      u.username === 'orawan' ||
+      u.employeeCode === 'EV-101' ||
+      (u.name.includes('อรวรรณ') && u.role === 'admin')
+    ) {
+      if (
+        u.id !== 'evaluator_1' ||
+        u.role !== 'evaluator' ||
+        u.name !== 'นางสาวอรวรรณ พงษ์ศิริ' ||
+        u.username !== 'orawan' ||
+        u.employeeCode !== 'EV-101' ||
+        !u.position.includes('รองผู้อำนวยการ')
+      ) {
+        hasChanged = true;
+      }
+      u = {
+        ...u,
+        id: 'evaluator_1',
+        name: 'นางสาวอรวรรณ พงษ์ศิริ',
+        username: 'orawan',
+        role: 'evaluator',
+        position: 'รองผู้อำนวยการสถานศึกษา (ประธานกรรมการ ชุดที่ 1)',
+        department: 'ฝ่ายบริหารงานวิชาการและบุคคล',
+        groupId: 'group_1',
+        employeeCode: 'EV-101',
+        email: u.email || 'orawan.p@chainat-special.ac.th',
+        phone: u.phone || '081-987-6543',
+        avatarUrl: u.avatarUrl || u.avatar || 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=256',
+        avatar: u.avatar || u.avatarUrl || 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=256',
+      };
+    }
+
+    // 2. Identify and fix rannaphat (EV-302 / user_admin_1)
+    else if (
+      u.id === 'user_admin_1' ||
+      u.username === 'rannaphat' ||
+      u.employeeCode === 'EV-302' ||
+      (u.name.includes('รัณย์ณภัทร') && u.role === 'admin')
+    ) {
+      if (
+        u.id !== 'user_admin_1' ||
+        u.role !== 'admin' ||
+        u.name !== 'นางสาวรัณย์ณภัทร มากุญชร' ||
+        u.username !== 'rannaphat' ||
+        u.employeeCode !== 'EV-302'
+      ) {
+        hasChanged = true;
+      }
+      u = {
+        ...u,
+        id: 'user_admin_1',
+        name: 'นางสาวรัณย์ณภัทร มากุญชร',
+        username: 'rannaphat',
+        role: 'admin',
+        position: 'ครูชำนาญการ (ผู้ดูแลระบบ / Admin & กรรมการลงทะเบียนและรวบรวมคะแนน)',
+        department: 'กลุ่มงานทะเบียนและประเมินผล',
+        employeeCode: 'EV-302',
+        email: u.email || 'rannaphat.m@chainat-special.ac.th',
+        phone: u.phone || '087-321-0987',
+        avatarUrl: u.avatarUrl || u.avatar || 'https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?auto=format&fit=crop&q=80&w=256',
+        avatar: u.avatar || u.avatarUrl || 'https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?auto=format&fit=crop&q=80&w=256',
+      };
+    }
+
+    // 3. Normalize avatar and avatarUrl for all users
+    if (u.avatar && !u.avatarUrl) {
+      u.avatarUrl = u.avatar;
+      hasChanged = true;
+    }
+    if (u.avatarUrl && !u.avatar) {
+      u.avatar = u.avatarUrl;
+      hasChanged = true;
+    }
+
+    userMap.set(u.id, u);
+  }
+
+  // Ensure evaluator_1 and user_admin_1 exist in map
+  if (!userMap.has('evaluator_1')) {
+    userMap.set('evaluator_1', INITIAL_USERS.find((u) => u.id === 'evaluator_1')!);
+    hasChanged = true;
+  }
+  if (!userMap.has('user_admin_1')) {
+    userMap.set('user_admin_1', INITIAL_USERS.find((u) => u.id === 'user_admin_1')!);
+    hasChanged = true;
+  }
+
+  const sanitized = Array.from(userMap.values());
+  return { sanitized, hasChanged };
+}
+
 interface AppContextType {
   // Auth
   currentUser: User;
@@ -143,7 +249,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // 1. Users state
   const [users, setUsers] = useState<User[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.USERS);
-    return saved ? JSON.parse(saved) : INITIAL_USERS;
+    const parsed = saved ? JSON.parse(saved) : INITIAL_USERS;
+    return sanitizeAndFixUsers(parsed).sanitized;
   });
 
   // 1.1 System Settings state
@@ -169,7 +276,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const saved = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        // Ensure currentUser is sanitized
+        const { sanitized } = sanitizeAndFixUsers([parsed]);
+        if (sanitized.length > 0) return sanitized[0];
       } catch (e) {
         // fallback
       }
@@ -327,7 +437,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         unsubUsers = FirebaseService.listenUsers((remoteUsers) => {
           if (remoteUsers && remoteUsers.length > 0) {
-            setUsers(remoteUsers);
+            const { sanitized, hasChanged } = sanitizeAndFixUsers(remoteUsers);
+            setUsers(sanitized);
+            if (hasChanged) {
+              console.log('Sanitized duplicate/corrupt admin/evaluator roles and updated Firebase...');
+              sanitized.forEach((u) => {
+                FirebaseService.saveUser(u).catch(console.error);
+              });
+            }
           }
         });
 
@@ -775,10 +892,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // User Management CRUD
   const addUser = (userData: Omit<User, 'id'>): User => {
     const newId = (userData.role === 'evaluator' ? 'evaluator_' : userData.role === 'admin' ? 'user_admin_' : 'staff_') + Date.now();
+    const avatarValue = userData.avatar || userData.avatarUrl || undefined;
     const newUser: User = {
       ...userData,
       id: newId,
       password: userData.password || 'password123',
+      avatar: avatarValue,
+      avatarUrl: avatarValue,
     };
     setUsers((prev) => [newUser, ...prev]);
     FirebaseService.saveUser(newUser).catch(console.error);
@@ -787,19 +907,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateUser = (user: User) => {
-    setUsers((prev) => prev.map((u) => (u.id === user.id ? user : u)));
-    if (currentUser.id === user.id) {
-      setCurrentUser(user);
+    const avatarValue = user.avatar || user.avatarUrl || undefined;
+    const synchronizedUser: User = {
+      ...user,
+      avatar: avatarValue,
+      avatarUrl: avatarValue,
+    };
+    setUsers((prev) => prev.map((u) => (u.id === synchronizedUser.id ? synchronizedUser : u)));
+    if (currentUser.id === synchronizedUser.id) {
+      setCurrentUser(synchronizedUser);
     }
-    FirebaseService.saveUser(user).catch(console.error);
-    logAudit('UPDATE_USER', `แก้ไขข้อมูลผู้ใช้งาน: ${user.name} (${user.position})`);
+    FirebaseService.saveUser(synchronizedUser).catch(console.error);
+    logAudit('UPDATE_USER', `แก้ไขข้อมูลผู้ใช้งาน: ${synchronizedUser.name} (${synchronizedUser.position})`);
   };
 
   const updateUserProfile = (userId: string, updates: Partial<User>) => {
+    const avatarValue = updates.avatar || updates.avatarUrl || undefined;
+    const normalizedUpdates: Partial<User> = {
+      ...updates,
+      ...(updates.avatar || updates.avatarUrl ? { avatar: avatarValue, avatarUrl: avatarValue } : {}),
+      ...(updates.avatar === '' || updates.avatarUrl === '' ? { avatar: '', avatarUrl: '' } : {}),
+    };
+
     setUsers((prev) =>
       prev.map((u) => {
         if (u.id === userId) {
-          const updatedUser = { ...u, ...updates };
+          const updatedUser = { ...u, ...normalizedUpdates };
           FirebaseService.saveUser(updatedUser).catch(console.error);
           return updatedUser;
         }
@@ -807,7 +940,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       })
     );
     if (currentUser.id === userId) {
-      setCurrentUser((prev) => ({ ...prev, ...updates }));
+      setCurrentUser((prev) => ({ ...prev, ...normalizedUpdates }));
     }
     logAudit('UPDATE_PROFILE', `อัปเดตข้อมูลโปรไฟล์และรูปภาพ: ${updates.name || currentUser.name}`);
   };

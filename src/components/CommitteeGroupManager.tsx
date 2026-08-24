@@ -269,8 +269,16 @@ export const CommitteeGroupManager: React.FC = () => {
                         key={evaluator.id}
                         className="flex items-center gap-2 text-xs bg-slate-50 p-2 rounded-lg border border-slate-100"
                       >
-                        <div className="w-6 h-6 rounded-full bg-blue-700 text-white flex items-center justify-center font-bold text-[10px]">
-                          {evaluator.name.charAt(0)}
+                        <div className="w-7 h-7 rounded-lg bg-blue-700 text-white flex items-center justify-center font-bold text-[10px] overflow-hidden shrink-0 shadow-2xs">
+                          {(evaluator.avatar || evaluator.avatarUrl) ? (
+                            <img
+                              src={evaluator.avatar || evaluator.avatarUrl}
+                              alt={evaluator.name}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            evaluator.name.charAt(0)
+                          )}
                         </div>
                         <div className="truncate">
                           <span className="font-semibold text-slate-800">{evaluator.name}</span>
