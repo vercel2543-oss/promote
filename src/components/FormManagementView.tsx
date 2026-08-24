@@ -126,10 +126,10 @@ export const FormManagementView: React.FC = () => {
             <span>Rubrics & Evaluation Form Management</span>
           </div>
           <h2 className="text-xl sm:text-2xl font-bold text-slate-900">
-            ระบบจัดการและแก้ไขแบบฟอร์มการประเมิน (13 แบบมาตรฐาน)
+            ระบบจัดการและแก้ไขแบบฟอร์มการประเมิน (แบบประเมินมาตรฐาน)
           </h2>
           <p className="text-xs sm:text-sm text-slate-500 mt-1">
-            ปรับปรุงตัวชี้วัด ค่าน้ำหนักคะแนน เกณฑ์การให้คะแนน หรือสร้างแบบฟอร์มใหม่สำหรับตำแหน่งเฉพาะ
+            ปรับปรุงตัวชี้วัด ค่าน้ำหนักคะแนน เกณฑ์การให้คะแนน สำหรับครูผู้ช่วย สายสนับสนุน และพนักงานราชการทั่วไป ตำแหน่งครูผู้สอน
           </p>
         </div>
 
@@ -138,10 +138,10 @@ export const FormManagementView: React.FC = () => {
             type="button"
             onClick={() => setConfirmResetModal(true)}
             className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold text-xs transition cursor-pointer"
-            title="รีเซ็ตแบบฟอร์มทั้งหมดเป็นค่ามาตรฐานกระทรวง"
+            title="รีเซ็ตแบบฟอร์มทั้งหมดเป็นค่ามาตรฐาน"
           >
             <RotateCcw className="w-3.5 h-3.5" />
-            <span>คืนค่ามาตรฐาน (13 แบบ)</span>
+            <span>คืนค่ามาตรฐานทั้งหมด</span>
           </button>
         </div>
       </div>
@@ -166,6 +166,7 @@ export const FormManagementView: React.FC = () => {
               {formTemplates.map((template, idx) => {
                 const isSelected = selectedTemplate?.id === template.id;
                 const isTeacher = template.group === 'teacher_assistant';
+                const isGovTeacher = template.group === 'government_employee_teacher';
                 return (
                   <button
                     key={template.id}
@@ -182,7 +183,9 @@ export const FormManagementView: React.FC = () => {
                   >
                     <div
                       className={`w-6 h-6 rounded-lg text-xs font-bold flex items-center justify-center shrink-0 mt-0.5 ${
-                        isTeacher
+                        isGovTeacher
+                          ? 'bg-purple-600 text-white'
+                          : isTeacher
                           ? 'bg-emerald-600 text-white'
                           : 'bg-indigo-600 text-white'
                       }`}
@@ -226,7 +229,7 @@ export const FormManagementView: React.FC = () => {
                       {selectedTemplate.code}
                     </span>
                     <span className="text-xs font-semibold text-slate-500">
-                      กลุ่ม: {selectedTemplate.group === 'teacher_assistant' ? 'ครูผู้ช่วย' : 'สายสนับสนุน'}
+                      กลุ่ม: {selectedTemplate.group === 'teacher_assistant' ? 'ครูผู้ช่วย' : selectedTemplate.group === 'government_employee_teacher' ? 'พนักงานราชการ (ครูผู้สอน)' : 'สายสนับสนุน'}
                     </span>
                   </div>
                   <h3 className="text-lg sm:text-xl font-bold text-slate-900 mt-1">

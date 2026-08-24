@@ -212,7 +212,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // 4. Form Templates
   const [formTemplates, setFormTemplates] = useState<FormTemplate[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.TEMPLATES);
-    return saved ? JSON.parse(saved) : FORM_TEMPLATES;
+    if (saved) {
+      try {
+        const parsed: FormTemplate[] = JSON.parse(saved);
+        const hasGovTeacher = parsed.some((t) => t.id === 'form_government_employee_teacher');
+        if (!hasGovTeacher) {
+          const govTemplate = FORM_TEMPLATES.find((t) => t.id === 'form_government_employee_teacher');
+          if (govTemplate) {
+            return [...parsed, govTemplate];
+          }
+        }
+        return parsed;
+      } catch (e) {
+        // fallback
+      }
+    }
+    return FORM_TEMPLATES;
   });
 
   // 5. Submissions
@@ -352,6 +367,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         unsubTemplates = FirebaseService.listenFormTemplates((remoteTemplates) => {
           if (remoteTemplates && remoteTemplates.length > 0) {
+            const hasGovTeacher = remoteTemplates.some((t) => t.id === 'form_government_employee_teacher');
+            if (!hasGovTeacher) {
+              const govTemplate = FORM_TEMPLATES.find((t) => t.id === 'form_government_employee_teacher');
+              if (govTemplate) {
+                FirebaseService.saveFormTemplate(govTemplate).catch(console.error);
+                setFormTemplates([...remoteTemplates, govTemplate]);
+                return;
+              }
+            }
             setFormTemplates(remoteTemplates);
           }
         });

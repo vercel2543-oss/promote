@@ -238,7 +238,23 @@ export function getFormTemplateForUser(
   // 2. Exact or substring match in positionTitle or code
   const cleanPos = (user.position || '').trim().toLowerCase();
 
-  // Specific check for ครูผู้ช่วย
+  // Specific check for พนักงานราชการ / ครูผู้สอน (กลุ่มที่ 3)
+  if (
+    user.positionGroup === 'government_employee_teacher' ||
+    cleanPos.includes('พนักงานราชการ') ||
+    (cleanPos.includes('ครูผู้สอน') && !cleanPos.includes('ครูผู้ช่วย'))
+  ) {
+    const govTeacherTemplate = templates.find(
+      (t) =>
+        t.id === 'form_government_employee_teacher' ||
+        t.group === 'government_employee_teacher' ||
+        t.code === 'G-01' ||
+        t.positionTitle.includes('ครูผู้สอน')
+    );
+    if (govTeacherTemplate) return govTeacherTemplate;
+  }
+
+  // Specific check for ครูผู้ช่วย (กลุ่มที่ 1)
   if (cleanPos.includes('ครูผู้ช่วย')) {
     const teacherTemplate = templates.find(
       (t) => t.id === 'form_teacher_assistant' || t.code === 'T-01' || t.positionTitle.includes('ครูผู้ช่วย')

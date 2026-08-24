@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { DigitalSignaturePad } from './DigitalSignaturePad';
-import { calculateSubmissionScores, getGradeInfo } from '../utils/evaluationCalculator';
+import { calculateSubmissionScores, getGradeInfo, getFormTemplateForUser } from '../utils/evaluationCalculator';
 import { FormTemplate, LeaveStats, DetailedComments, RecommendationSummary } from '../types';
 
 interface EvaluationFormViewProps {
@@ -45,9 +45,20 @@ export const EvaluationFormView: React.FC<EvaluationFormViewProps> = ({ onEvalua
     gradeThresholds,
   } = useApp();
 
-  const currentForm = formTemplates.find((t) => t.id === selectedFormId) || formTemplates[0];
   const evaluatees = users.filter((u) => u.role === 'staff');
   const currentEvaluatee = evaluatees.find((u) => u.id === selectedEvaluateeId) || evaluatees[0];
+
+  // Auto-sync form template with current evaluatee whenever evaluatee changes or mounts
+  useEffect(() => {
+    if (currentEvaluatee) {
+      const template = getFormTemplateForUser(currentEvaluatee, formTemplates);
+      if (template && (!selectedFormId || !formTemplates.some(t => t.id === selectedFormId) || currentEvaluatee.formTemplateId === template.id)) {
+        setSelectedFormId(template.id);
+      }
+    }
+  }, [currentEvaluatee?.id, currentEvaluatee?.formTemplateId, formTemplates]);
+
+  const currentForm = formTemplates.find((t) => t.id === selectedFormId) || (currentEvaluatee ? getFormTemplateForUser(currentEvaluatee, formTemplates) : formTemplates[0]);
 
   // User's group for this candidate
   const assignedGroup =
@@ -367,25 +378,25 @@ export const EvaluationFormView: React.FC<EvaluationFormViewProps> = ({ onEvalua
   return (
     <div className="max-w-5xl mx-auto space-y-6 sm:space-y-8 pb-16">
       
-      {/* 1. Form Selector Header (2 กลุ่มหลัก 13 ตำแหน่ง) */}
+      {/* 1. Form Selector Header (3 กลุ่มหลัก 14 ตำแหน่ง) */}
       <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200 shadow-xs space-y-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-100">
           <div>
             <div className="flex items-center gap-2">
               <Layers className="w-5 h-5 text-blue-700" />
               <h2 className="text-lg sm:text-xl font-bold text-slate-900">
-                เลือกแบบฟอร์มการประเมิน (13 ตำแหน่ง / 2 กลุ่มหลัก)
+                เลือกแบบฟอร์มการประเมิน (14 ตำแหน่ง / 3 กลุ่มหลัก)
               </h2>
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
-              ยึดตามเกณฑ์แบบฟอร์มการประเมินลูกจ้างชั่วคราวเพื่อพิจารณาจ้างต่อ/งดจ้างต่อ (100 คะแนน)
+              ยึดตามเกณฑ์แบบฟอร์มการประเมินเพื่อพิจารณาจ้างต่อ/งดจ้างต่อ และประเมินผลการปฏิบัติงาน (100 คะแนนเต็ม)
             </p>
           </div>
 
-          {/* Group 1 vs Group 2 Fast Switcher */}
-          <div className="flex items-center gap-2">
+          {/* Group 1 vs Group 2 vs Group 3 Fast Switcher */}
+          <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs font-semibold text-slate-500">กลุ่มหลัก:</span>
-            <div className="inline-flex rounded-xl bg-slate-100 p-1">
+            <div className="inline-flex rounded-xl bg-slate-100 p-1 flex-wrap gap-1">
               <button
                 type="button"
                 onClick={() => {
@@ -408,11 +419,25 @@ export const EvaluationFormView: React.FC<EvaluationFormViewProps> = ({ onEvalua
                 }}
                 className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
                   currentForm.group === 'support_staff'
-                    ? 'bg-blue-600 text-white shadow-xs'
+                    ? 'bg-emerald-600 text-white shadow-xs'
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                กลุ่มที่ 2: สายสนับสนุน (12 สายงาน)
+                กลุ่มที่ 2: จ้างเหมาบริการ
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const govForm = formTemplates.find((t) => t.group === 'government_employee_teacher' || t.id === 'form_government_employee_teacher');
+                  if (govForm) setSelectedFormId(govForm.id);
+                }}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                  currentForm.group === 'government_employee_teacher'
+                    ? 'bg-purple-600 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                กลุ่มที่ 3: พนักงานราชการ (ครูผู้สอน)
               </button>
             </div>
           </div>
@@ -422,28 +447,37 @@ export const EvaluationFormView: React.FC<EvaluationFormViewProps> = ({ onEvalua
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1.5">
-              1. เลือกแบบประเมินตำแหน่งงาน:
+              1. เลือกแบบประเมินตำแหน่งงาน (14 ตำแหน่ง / 3 กลุ่มหลัก):
             </label>
             <select
               value={selectedFormId}
               onChange={(e) => setSelectedFormId(e.target.value)}
               className="w-full py-2.5 px-3 rounded-xl border border-slate-300 bg-white font-medium text-xs sm:text-sm text-slate-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
             >
-              <optgroup label="กลุ่มที่ 1: ลูกจ้างชั่วคราว ตำแหน่งครูผู้ช่วย">
+              <optgroup label="กลุ่มที่ 1 : ตำแหน่ง ครูผู้ช่วย (ลูกจ้างชั่วคราว)">
                 {formTemplates
                   .filter((t) => t.group === 'teacher_assistant')
                   .map((t) => (
                     <option key={t.id} value={t.id}>
-                      {t.code}: {t.title}
+                      [{t.code}] {t.title}
                     </option>
                   ))}
               </optgroup>
-              <optgroup label="กลุ่มที่ 2: ลูกจ้างชั่วคราว สายสนับสนุน/ปฏิบัติงาน (12 ตำแหน่ง)">
+              <optgroup label="กลุ่มที่ 2 : จ้างเหมาบริการทุกตำแหน่ง (12 ตำแหน่ง)">
                 {formTemplates
                   .filter((t) => t.group === 'support_staff')
                   .map((t) => (
                     <option key={t.id} value={t.id}>
-                      {t.code}: {t.title}
+                      [{t.code}] {t.title}
+                    </option>
+                  ))}
+              </optgroup>
+              <optgroup label="กลุ่มที่ 3 : พนักงานราชการทั่วไป ตำแหน่ง ครูผู้สอน">
+                {formTemplates
+                  .filter((t) => t.group === 'government_employee_teacher')
+                  .map((t) => (
+                    <option key={t.id} value={t.id}>
+                      [{t.code}] {t.title}
                     </option>
                   ))}
               </optgroup>
@@ -456,7 +490,17 @@ export const EvaluationFormView: React.FC<EvaluationFormViewProps> = ({ onEvalua
             </label>
             <select
               value={selectedEvaluateeId}
-              onChange={(e) => setSelectedEvaluateeId(e.target.value)}
+              onChange={(e) => {
+                const newEvalId = e.target.value;
+                setSelectedEvaluateeId(newEvalId);
+                const targetEval = evaluatees.find((u) => u.id === newEvalId);
+                if (targetEval) {
+                  const targetTemplate = getFormTemplateForUser(targetEval, formTemplates);
+                  if (targetTemplate) {
+                    setSelectedFormId(targetTemplate.id);
+                  }
+                }
+              }}
               className="w-full py-2.5 px-3 rounded-xl border border-slate-300 bg-white font-medium text-xs sm:text-sm text-slate-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
             >
               {evaluatees.map((u) => (
@@ -776,6 +820,7 @@ export const EvaluationFormView: React.FC<EvaluationFormViewProps> = ({ onEvalua
               <div className="divide-y divide-slate-100">
                 {category.indicators.map((indicator, indIdx) => {
                   const currentScore = scores[indicator.id] || 0;
+                  const isWeight20 = indicator.weight === 20;
                   const isWeight15 = indicator.weight === 15;
                   const isWeight10 = indicator.weight === 10;
 
@@ -807,7 +852,42 @@ export const EvaluationFormView: React.FC<EvaluationFormViewProps> = ({ onEvalua
                         </div>
 
                         {/* Interactive Score Selector */}
-                        {isWeight15 ? (
+                        {isWeight20 ? (
+                          /* 20-point scale selector */
+                          <div className="flex flex-col items-end gap-2 shrink-0">
+                            <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                              {[20, 19, 18, 17, 16, 15, 14, 12, 10, 5].map((val) => (
+                                <button
+                                  key={val}
+                                  type="button"
+                                  onClick={() => handleScoreChange(indicator.id, val)}
+                                  className={`px-2.5 py-1.5 rounded-lg text-xs font-bold border transition cursor-pointer ${
+                                    currentScore === val
+                                      ? 'bg-purple-600 text-white border-purple-600 shadow-xs ring-2 ring-purple-400/20'
+                                      : 'bg-slate-50 hover:bg-purple-50 text-slate-700 border-slate-200'
+                                  }`}
+                                >
+                                  {val}
+                                </button>
+                              ))}
+                            </div>
+                            
+                            {/* Manual precision number input */}
+                            <div className="flex items-center gap-2">
+                              <span className="text-[11px] text-slate-500 font-medium">ระบุคะแนน (0-20):</span>
+                              <input
+                                type="number"
+                                min="0"
+                                max="20"
+                                value={currentScore || ''}
+                                onChange={(e) => handleScoreChange(indicator.id, Math.min(20, Math.max(0, Number(e.target.value))))}
+                                className="w-16 p-1.5 text-center text-xs font-bold border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                                placeholder="0-20"
+                              />
+                              <span className="text-xs font-bold text-slate-700">/ 20</span>
+                            </div>
+                          </div>
+                        ) : isWeight15 ? (
                           /* 15-point scale selector */
                           <div className="flex flex-col items-end gap-2 shrink-0">
                             <div className="flex items-center gap-1.5 flex-wrap justify-end">

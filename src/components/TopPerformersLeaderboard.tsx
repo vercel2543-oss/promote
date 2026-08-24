@@ -29,25 +29,39 @@ export const TopPerformersLeaderboard: React.FC<TopPerformersLeaderboardProps> =
   gradeThresholds,
   onOpenReport,
 }) => {
-  const [activeTab, setActiveTab] = useState<'both' | 'teacher' | 'support'>('both');
+  const [activeTab, setActiveTab] = useState<'all' | 'teacher' | 'support' | 'gov_teacher'>('all');
   const [showAllTeacher, setShowAllTeacher] = useState(false);
   const [showAllSupport, setShowAllSupport] = useState(false);
+  const [showAllGov, setShowAllGov] = useState(false);
 
   // Group 1: ครูผู้ช่วย
   const teacherResults = aggregatedResults
     .filter(
       (r) =>
         r.evaluatee.positionGroup === 'teacher_assistant' ||
-        r.evaluatee.position.includes('ครูผู้ช่วย')
+        (r.evaluatee.position.includes('ครูผู้ช่วย') && !r.evaluatee.position.includes('พนักงานราชการ'))
     )
     .sort((a, b) => b.meanPercentage - a.meanPercentage);
 
-  // Group 2: สายสนับสนุน (12 ตำแหน่งงาน)
+  // Group 2: จ้างเหมาบริการทุกตำแหน่ง
   const supportResults = aggregatedResults
     .filter(
       (r) =>
         r.evaluatee.positionGroup === 'support_staff' ||
-        !r.evaluatee.position.includes('ครูผู้ช่วย')
+        (!r.evaluatee.position.includes('ครูผู้ช่วย') &&
+          !r.evaluatee.position.includes('พนักงานราชการ') &&
+          r.evaluatee.positionGroup !== 'teacher_assistant' &&
+          r.evaluatee.positionGroup !== 'government_employee_teacher')
+    )
+    .sort((a, b) => b.meanPercentage - a.meanPercentage);
+
+  // Group 3: พนักงานราชการทั่วไป ตำแหน่ง ครูผู้สอน
+  const govTeacherResults = aggregatedResults
+    .filter(
+      (r) =>
+        r.evaluatee.positionGroup === 'government_employee_teacher' ||
+        r.evaluatee.position.includes('พนักงานราชการ') ||
+        (r.evaluatee.position.includes('ครูผู้สอน') && !r.evaluatee.position.includes('ครูผู้ช่วย'))
     )
     .sort((a, b) => b.meanPercentage - a.meanPercentage);
 
@@ -63,6 +77,13 @@ export const TopPerformersLeaderboard: React.FC<TopPerformersLeaderboardProps> =
   const supportAvgScore =
     supportResults.length > 0
       ? supportResults.reduce((acc, curr) => acc + curr.meanPercentage, 0) / supportResults.length
+      : 0;
+
+  // Stats for Group 3
+  const govMaxScore = govTeacherResults.length > 0 ? govTeacherResults[0].meanPercentage : 0;
+  const govAvgScore =
+    govTeacherResults.length > 0
+      ? govTeacherResults.reduce((acc, curr) => acc + curr.meanPercentage, 0) / govTeacherResults.length
       : 0;
 
   // Helper for rank badge
@@ -208,17 +229,17 @@ export const TopPerformersLeaderboard: React.FC<TopPerformersLeaderboardProps> =
         </div>
 
         {/* View Switcher Tabs */}
-        <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-2xl text-xs font-semibold self-start sm:self-auto">
+        <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-2xl text-xs font-semibold self-start sm:self-auto flex-wrap">
           <button
             type="button"
-            onClick={() => setActiveTab('both')}
+            onClick={() => setActiveTab('all')}
             className={`px-3 py-1.5 rounded-xl transition cursor-pointer ${
-              activeTab === 'both'
+              activeTab === 'all'
                 ? 'bg-white text-slate-900 shadow-xs'
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            แสดงทั้ง 2 กลุ่ม
+            แสดงทั้ง 3 กลุ่ม
           </button>
           <button
             type="button"
@@ -229,7 +250,7 @@ export const TopPerformersLeaderboard: React.FC<TopPerformersLeaderboardProps> =
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            ครูผู้ช่วย
+            กลุ่ม 1: ครูผู้ช่วย
           </button>
           <button
             type="button"
@@ -240,21 +261,32 @@ export const TopPerformersLeaderboard: React.FC<TopPerformersLeaderboardProps> =
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            สายสนับสนุน (12 ตำแหน่ง)
+            กลุ่ม 2: จ้างเหมาบริการ
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('gov_teacher')}
+            className={`px-3 py-1.5 rounded-xl transition cursor-pointer ${
+              activeTab === 'gov_teacher'
+                ? 'bg-white text-purple-700 shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            กลุ่ม 3: พนักงานราชการ ครูผู้สอน
           </button>
         </div>
       </div>
 
-      {/* Main 2-Group Comparison Grid */}
+      {/* Main 3-Group Comparison Grid */}
       <div
         className={`grid gap-6 ${
-          activeTab === 'both' ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'
+          activeTab === 'all' ? 'grid-cols-1 lg:grid-cols-3' : 'grid-cols-1'
         }`}
       >
         {/* ========================================================= */}
         {/* GROUP 1: ครูผู้ช่วย (Teacher Assistant)                    */}
         {/* ========================================================= */}
-        {(activeTab === 'both' || activeTab === 'teacher') && (
+        {(activeTab === 'all' || activeTab === 'teacher') && (
           <div className="rounded-3xl bg-slate-50/70 border border-slate-200/90 p-5 sm:p-6 flex flex-col justify-between space-y-5">
             {/* Group Title & Summary Stats */}
             <div>
@@ -265,10 +297,10 @@ export const TopPerformersLeaderboard: React.FC<TopPerformersLeaderboardProps> =
                   </div>
                   <div>
                     <h4 className="font-bold text-sm sm:text-base text-slate-900">
-                      กลุ่มที่ 1: ลูกจ้างชั่วคราว ตำแหน่งครูผู้ช่วย
+                      กลุ่มที่ 1 : ตำแหน่ง ครูผู้ช่วย
                     </h4>
                     <p className="text-[11px] text-slate-500">
-                      รวม {teacherResults.length} คน • เกณฑ์ภาระงานสอนและการพัฒนาผู้เรียน
+                      ลูกจ้างชั่วคราว ({teacherResults.length} คน)
                     </p>
                   </div>
                 </div>
@@ -281,13 +313,13 @@ export const TopPerformersLeaderboard: React.FC<TopPerformersLeaderboardProps> =
               {/* Group Quick Stats Pill */}
               <div className="grid grid-cols-2 gap-3 p-3 rounded-2xl bg-white border border-slate-200/80 mb-5">
                 <div className="text-center border-r border-slate-100 pr-2">
-                  <span className="text-[10px] text-slate-500 block">คะแนนสูงสุดในกลุ่ม</span>
+                  <span className="text-[10px] text-slate-500 block">คะแนนสูงสุด</span>
                   <span className="text-sm font-extrabold text-blue-700">
                     {teacherMaxScore.toFixed(2)}%
                   </span>
                 </div>
                 <div className="text-center pl-2">
-                  <span className="text-[10px] text-slate-500 block">คะแนนเฉลี่ยทั้งกลุ่ม</span>
+                  <span className="text-[10px] text-slate-500 block">คะแนนเฉลี่ย</span>
                   <span className="text-sm font-extrabold text-slate-800">
                     {teacherAvgScore.toFixed(2)}%
                   </span>
@@ -297,14 +329,14 @@ export const TopPerformersLeaderboard: React.FC<TopPerformersLeaderboardProps> =
               {/* Podium Display (Top 3) */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between text-xs font-bold text-slate-700">
-                  <span>อันดับคะแนนสูงสุดประจำกลุ่ม</span>
+                  <span>อันดับคะแนนสูงสุด</span>
                   <span className="text-blue-600 text-[11px]">
                     Top {Math.min(3, teacherResults.length)}
                   </span>
                 </div>
 
                 {teacherResults.length > 0 ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="space-y-2.5">
                     {teacherResults.slice(0, 3).map((res, idx) => {
                       const scheme = idx === 0 ? 'gold' : idx === 1 ? 'silver' : 'bronze';
                       return renderPodiumItem(res, idx + 1, scheme);
@@ -312,56 +344,10 @@ export const TopPerformersLeaderboard: React.FC<TopPerformersLeaderboardProps> =
                   </div>
                 ) : (
                   <div className="p-6 text-center text-xs text-slate-400 bg-white rounded-2xl border border-slate-200">
-                    ยังไม่มีข้อมูลผลการประเมินในกลุ่มครูผู้ช่วย
+                    ยังไม่มีข้อมูลผลการประเมิน
                   </div>
                 )}
               </div>
-
-              {/* Expandable Remaining List (if more than 3) */}
-              {teacherResults.length > 3 && showAllTeacher && (
-                <div className="mt-4 pt-4 border-t border-slate-200 space-y-2 animate-in fade-in">
-                  <span className="text-xs font-bold text-slate-600 block mb-2">
-                    อันดับลำดับถัดไป (อันดับ 4 เป็นต้นไป):
-                  </span>
-                  {teacherResults.slice(3).map((res, idx) => {
-                    const gradeInfo = getGradeInfo(res.finalGrade, gradeThresholds);
-                    return (
-                      <div
-                        key={res.evaluateeId}
-                        className="p-3 bg-white rounded-xl border border-slate-200 flex items-center justify-between gap-3 text-xs"
-                      >
-                        <div className="flex items-center gap-2.5">
-                          {renderRankBadge(idx + 4)}
-                          <div>
-                            <div className="font-bold text-slate-900">{res.evaluatee.name}</div>
-                            <div className="text-[11px] text-slate-500">
-                              {res.evaluatee.position}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <span
-                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${gradeInfo.badgeBg}`}
-                          >
-                            {res.finalGrade}
-                          </span>
-                          <span className="font-bold text-slate-900">
-                            {res.meanPercentage.toFixed(2)}%
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => onOpenReport(res)}
-                            className="p-1 rounded-lg hover:bg-slate-100 text-blue-600"
-                            title="ดูรายงาน"
-                          >
-                            <FileText className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
             </div>
 
             {/* Toggle View More Button */}
@@ -371,7 +357,7 @@ export const TopPerformersLeaderboard: React.FC<TopPerformersLeaderboardProps> =
                 onClick={() => setShowAllTeacher(!showAllTeacher)}
                 className="w-full py-2 rounded-xl bg-white hover:bg-slate-100 text-xs font-semibold text-slate-600 border border-slate-200 transition flex items-center justify-center gap-1.5 cursor-pointer"
               >
-                <span>{showAllTeacher ? 'ย่อเหลือ Top 3' : `ดูอันดับทั้งหมด (${teacherResults.length} คน)`}</span>
+                <span>{showAllTeacher ? 'ย่อเหลือ Top 3' : `ดูทั้งหมด (${teacherResults.length} คน)`}</span>
                 {showAllTeacher ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
               </button>
             )}
@@ -379,9 +365,9 @@ export const TopPerformersLeaderboard: React.FC<TopPerformersLeaderboardProps> =
         )}
 
         {/* ========================================================= */}
-        {/* GROUP 2: สายสนับสนุน 12 ตำแหน่ง (Support Staff)           */}
+        {/* GROUP 2: จ้างเหมาบริการทุกตำแหน่ง                          */}
         {/* ========================================================= */}
-        {(activeTab === 'both' || activeTab === 'support') && (
+        {(activeTab === 'all' || activeTab === 'support') && (
           <div className="rounded-3xl bg-slate-50/70 border border-slate-200/90 p-5 sm:p-6 flex flex-col justify-between space-y-5">
             {/* Group Title & Summary Stats */}
             <div>
@@ -392,29 +378,29 @@ export const TopPerformersLeaderboard: React.FC<TopPerformersLeaderboardProps> =
                   </div>
                   <div>
                     <h4 className="font-bold text-sm sm:text-base text-slate-900">
-                      กลุ่มที่ 2: ลูกจ้างชั่วคราว สายสนับสนุน/ปฏิบัติงาน
+                      กลุ่มที่ 2 : จ้างเหมาบริการทุกตำแหน่ง
                     </h4>
                     <p className="text-[11px] text-slate-500">
-                      ครอบคลุม 12 ตำแหน่งงาน (พี่เลี้ยงเด็กพิการ, คนงาน, คนครัว ฯลฯ)
+                      12 สายงาน ({supportResults.length} คน)
                     </p>
                   </div>
                 </div>
 
                 <span className="px-2.5 py-1 rounded-xl text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  กลุ่มที่ 2 (12 ตำแหน่ง)
+                  กลุ่มที่ 2
                 </span>
               </div>
 
               {/* Group Quick Stats Pill */}
               <div className="grid grid-cols-2 gap-3 p-3 rounded-2xl bg-white border border-slate-200/80 mb-5">
                 <div className="text-center border-r border-slate-100 pr-2">
-                  <span className="text-[10px] text-slate-500 block">คะแนนสูงสุดในกลุ่ม</span>
+                  <span className="text-[10px] text-slate-500 block">คะแนนสูงสุด</span>
                   <span className="text-sm font-extrabold text-emerald-700">
                     {supportMaxScore.toFixed(2)}%
                   </span>
                 </div>
                 <div className="text-center pl-2">
-                  <span className="text-[10px] text-slate-500 block">คะแนนเฉลี่ยทั้งกลุ่ม</span>
+                  <span className="text-[10px] text-slate-500 block">คะแนนเฉลี่ย</span>
                   <span className="text-sm font-extrabold text-slate-800">
                     {supportAvgScore.toFixed(2)}%
                   </span>
@@ -424,14 +410,14 @@ export const TopPerformersLeaderboard: React.FC<TopPerformersLeaderboardProps> =
               {/* Podium Display (Top 3) */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between text-xs font-bold text-slate-700">
-                  <span>อันดับคะแนนสูงสุดประจำกลุ่ม (Top 3)</span>
+                  <span>อันดับคะแนนสูงสุด</span>
                   <span className="text-emerald-600 text-[11px]">
                     Top {Math.min(3, supportResults.length)}
                   </span>
                 </div>
 
                 {supportResults.length > 0 ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="space-y-2.5">
                     {supportResults.slice(0, 3).map((res, idx) => {
                       const scheme = idx === 0 ? 'gold' : idx === 1 ? 'silver' : 'bronze';
                       return renderPodiumItem(res, idx + 1, scheme);
@@ -439,56 +425,10 @@ export const TopPerformersLeaderboard: React.FC<TopPerformersLeaderboardProps> =
                   </div>
                 ) : (
                   <div className="p-6 text-center text-xs text-slate-400 bg-white rounded-2xl border border-slate-200">
-                    ยังไม่มีข้อมูลผลการประเมินในกลุ่มสายสนับสนุน
+                    ยังไม่มีข้อมูลผลการประเมิน
                   </div>
                 )}
               </div>
-
-              {/* Expandable Remaining List (if more than 3) */}
-              {supportResults.length > 3 && showAllSupport && (
-                <div className="mt-4 pt-4 border-t border-slate-200 space-y-2 animate-in fade-in">
-                  <span className="text-xs font-bold text-slate-600 block mb-2">
-                    อันดับลำดับถัดไป (อันดับ 4 - 12):
-                  </span>
-                  {supportResults.slice(3).map((res, idx) => {
-                    const gradeInfo = getGradeInfo(res.finalGrade, gradeThresholds);
-                    return (
-                      <div
-                        key={res.evaluateeId}
-                        className="p-3 bg-white rounded-xl border border-slate-200 flex items-center justify-between gap-3 text-xs"
-                      >
-                        <div className="flex items-center gap-2.5">
-                          {renderRankBadge(idx + 4)}
-                          <div>
-                            <div className="font-bold text-slate-900">{res.evaluatee.name}</div>
-                            <div className="text-[11px] text-slate-500">
-                              {res.evaluatee.position}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <span
-                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${gradeInfo.badgeBg}`}
-                          >
-                            {res.finalGrade}
-                          </span>
-                          <span className="font-bold text-slate-900">
-                            {res.meanPercentage.toFixed(2)}%
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => onOpenReport(res)}
-                            className="p-1 rounded-lg hover:bg-slate-100 text-blue-600"
-                            title="ดูรายงาน"
-                          >
-                            <FileText className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
             </div>
 
             {/* Toggle View More Button */}
@@ -498,8 +438,89 @@ export const TopPerformersLeaderboard: React.FC<TopPerformersLeaderboardProps> =
                 onClick={() => setShowAllSupport(!showAllSupport)}
                 className="w-full py-2 rounded-xl bg-white hover:bg-slate-100 text-xs font-semibold text-slate-600 border border-slate-200 transition flex items-center justify-center gap-1.5 cursor-pointer"
               >
-                <span>{showAllSupport ? 'ย่อเหลือ Top 3' : `ดูอันดับทั้งหมด (${supportResults.length} คน)`}</span>
+                <span>{showAllSupport ? 'ย่อเหลือ Top 3' : `ดูทั้งหมด (${supportResults.length} คน)`}</span>
                 {showAllSupport ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* ========================================================= */}
+        {/* GROUP 3: พนักงานราชการทั่วไป ตำแหน่ง ครูผู้สอน            */}
+        {/* ========================================================= */}
+        {(activeTab === 'all' || activeTab === 'gov_teacher') && (
+          <div className="rounded-3xl bg-slate-50/70 border border-slate-200/90 p-5 sm:p-6 flex flex-col justify-between space-y-5">
+            {/* Group Title & Summary Stats */}
+            <div>
+              <div className="flex items-start justify-between gap-3 mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-purple-100 text-purple-700 flex items-center justify-center">
+                    <Sparkles className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-sm sm:text-base text-slate-900">
+                      กลุ่มที่ 3 : พนักงานราชการ ครูผู้สอน
+                    </h4>
+                    <p className="text-[11px] text-slate-500">
+                      พนักงานราชการทั่วไป ({govTeacherResults.length} คน)
+                    </p>
+                  </div>
+                </div>
+
+                <span className="px-2.5 py-1 rounded-xl text-[11px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                  กลุ่มที่ 3
+                </span>
+              </div>
+
+              {/* Group Quick Stats Pill */}
+              <div className="grid grid-cols-2 gap-3 p-3 rounded-2xl bg-white border border-slate-200/80 mb-5">
+                <div className="text-center border-r border-slate-100 pr-2">
+                  <span className="text-[10px] text-slate-500 block">คะแนนสูงสุด</span>
+                  <span className="text-sm font-extrabold text-purple-700">
+                    {govMaxScore.toFixed(2)}%
+                  </span>
+                </div>
+                <div className="text-center pl-2">
+                  <span className="text-[10px] text-slate-500 block">คะแนนเฉลี่ย</span>
+                  <span className="text-sm font-extrabold text-slate-800">
+                    {govAvgScore.toFixed(2)}%
+                  </span>
+                </div>
+              </div>
+
+              {/* Podium Display (Top 3) */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between text-xs font-bold text-slate-700">
+                  <span>อันดับคะแนนสูงสุด</span>
+                  <span className="text-purple-600 text-[11px]">
+                    Top {Math.min(3, govTeacherResults.length)}
+                  </span>
+                </div>
+
+                {govTeacherResults.length > 0 ? (
+                  <div className="space-y-2.5">
+                    {govTeacherResults.slice(0, 3).map((res, idx) => {
+                      const scheme = idx === 0 ? 'gold' : idx === 1 ? 'silver' : 'bronze';
+                      return renderPodiumItem(res, idx + 1, scheme);
+                    })}
+                  </div>
+                ) : (
+                  <div className="p-6 text-center text-xs text-slate-400 bg-white rounded-2xl border border-slate-200">
+                    ยังไม่มีข้อมูลผลการประเมิน
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Toggle View More Button */}
+            {govTeacherResults.length > 3 && (
+              <button
+                type="button"
+                onClick={() => setShowAllGov(!showAllGov)}
+                className="w-full py-2 rounded-xl bg-white hover:bg-slate-100 text-xs font-semibold text-slate-600 border border-slate-200 transition flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <span>{showAllGov ? 'ย่อเหลือ Top 3' : `ดูทั้งหมด (${govTeacherResults.length} คน)`}</span>
+                {showAllGov ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
               </button>
             )}
           </div>

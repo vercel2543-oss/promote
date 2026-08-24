@@ -54,7 +54,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenReport }) => {
   } = useApp();
 
   const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
-  const [quickFilter, setQuickFilter] = useState<'all' | 'my' | 'teacher' | 'support'>('all');
+  const [quickFilter, setQuickFilter] = useState<'all' | 'my' | 'teacher' | 'support' | 'gov_teacher'>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterGroup, setFilterGroup] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -70,7 +70,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenReport }) => {
   ).length;
   const pendingCount = aggregatedResults.filter((r) => r.submittedCommitteeCount === 0).length;
 
-  // Counts for quick filter tabs
+  // Counts for quick filter tabs (3 main groups)
   const myAssignedCount = aggregatedResults.filter((item) => {
     return committeeGroups.find((g) => g.id === item.groupId)?.evaluatorIds.includes(currentUser.id);
   }).length;
@@ -78,13 +78,23 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenReport }) => {
   const teacherCount = aggregatedResults.filter(
     (item) =>
       item.evaluatee.positionGroup === 'teacher_assistant' ||
-      item.evaluatee.position.includes('ครู')
+      (item.evaluatee.position.includes('ครูผู้ช่วย') && !item.evaluatee.position.includes('พนักงานราชการ'))
+  ).length;
+
+  const govTeacherCount = aggregatedResults.filter(
+    (item) =>
+      item.evaluatee.positionGroup === 'government_employee_teacher' ||
+      item.evaluatee.position.includes('พนักงานราชการ') ||
+      (item.evaluatee.position.includes('ครูผู้สอน') && !item.evaluatee.position.includes('ครูผู้ช่วย'))
   ).length;
 
   const supportCount = aggregatedResults.filter(
     (item) =>
       item.evaluatee.positionGroup === 'support_staff' ||
-      (!item.evaluatee.position.includes('ครู') && item.evaluatee.positionGroup !== 'teacher_assistant')
+      (!item.evaluatee.position.includes('ครูผู้ช่วย') &&
+        !item.evaluatee.position.includes('พนักงานราชการ') &&
+        item.evaluatee.positionGroup !== 'teacher_assistant' &&
+        item.evaluatee.positionGroup !== 'government_employee_teacher')
   ).length;
 
   // Grade distributions for Pie Chart
@@ -159,11 +169,19 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenReport }) => {
     } else if (quickFilter === 'teacher') {
       matchesQuick =
         item.evaluatee.positionGroup === 'teacher_assistant' ||
-        item.evaluatee.position.includes('ครู');
+        (item.evaluatee.position.includes('ครูผู้ช่วย') && !item.evaluatee.position.includes('พนักงานราชการ'));
+    } else if (quickFilter === 'gov_teacher') {
+      matchesQuick =
+        item.evaluatee.positionGroup === 'government_employee_teacher' ||
+        item.evaluatee.position.includes('พนักงานราชการ') ||
+        (item.evaluatee.position.includes('ครูผู้สอน') && !item.evaluatee.position.includes('ครูผู้ช่วย'));
     } else if (quickFilter === 'support') {
       matchesQuick =
         item.evaluatee.positionGroup === 'support_staff' ||
-        (!item.evaluatee.position.includes('ครู') && item.evaluatee.positionGroup !== 'teacher_assistant');
+        (!item.evaluatee.position.includes('ครูผู้ช่วย') &&
+          !item.evaluatee.position.includes('พนักงานราชการ') &&
+          item.evaluatee.positionGroup !== 'teacher_assistant' &&
+          item.evaluatee.positionGroup !== 'government_employee_teacher');
     }
 
     return matchesSearch && matchesGroup && matchesStatus && matchesQuick;
@@ -516,9 +534,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenReport }) => {
                     ? 'bg-blue-600 text-white shadow-xs'
                     : 'bg-blue-50 text-blue-800 hover:bg-blue-100 border border-blue-200'
                 }`}
+                title="กลุ่มที่ 1 : ตำแหน่ง ครูผู้ช่วย (ลูกจ้างชั่วคราว)"
               >
                 <GraduationCap className="w-3.5 h-3.5" />
-                <span>ครูผู้ช่วย ({teacherCount})</span>
+                <span>กลุ่ม 1: ครูผู้ช่วย ({teacherCount})</span>
               </button>
 
               <button
@@ -529,9 +548,24 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenReport }) => {
                     ? 'bg-amber-600 text-white shadow-xs'
                     : 'bg-amber-50 text-amber-900 hover:bg-amber-100 border border-amber-200'
                 }`}
+                title="กลุ่มที่ 2 : จ้างเหมาบริการทุกตำแหน่ง"
               >
                 <Briefcase className="w-3.5 h-3.5" />
-                <span>สายสนับสนุน 12 ตำแหน่ง ({supportCount})</span>
+                <span>กลุ่ม 2: จ้างเหมาบริการ ({supportCount})</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setQuickFilter('gov_teacher')}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                  quickFilter === 'gov_teacher'
+                    ? 'bg-purple-600 text-white shadow-xs'
+                    : 'bg-purple-50 text-purple-900 hover:bg-purple-100 border border-purple-200'
+                }`}
+                title="กลุ่มที่ 3 : พนักงานราชการทั่วไป ตำแหน่ง ครูผู้สอน"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>กลุ่ม 3: พนักงานราชการ ครูผู้สอน ({govTeacherCount})</span>
               </button>
             </div>
 

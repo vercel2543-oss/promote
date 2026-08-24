@@ -111,7 +111,7 @@ export const Navbar: React.FC = () => {
       return [
         { id: 'dashboard', label: 'แดชบอร์ดสรุปผล', icon: BarChart3 },
         { id: 'users', label: 'จัดการผู้ใช้งาน', icon: UserCog },
-        { id: 'forms_admin', label: 'จัดการแบบฟอร์ม 13 แบบ', icon: FileEdit },
+        { id: 'forms_admin', label: 'จัดการแบบฟอร์ม (14 ตำแหน่ง)', icon: FileEdit },
         { id: 'groups', label: 'จัดการกลุ่มกรรมการ', icon: Users },
         { id: 'reports', label: 'รายงาน & Export', icon: FileText },
         { id: 'settings', label: 'ตั้งค่าระบบ', icon: Settings },
@@ -122,13 +122,13 @@ export const Navbar: React.FC = () => {
         { id: 'dashboard', label: 'แดชบอร์ดสรุปผล', icon: BarChart3 },
         { id: 'evaluate', label: 'แบบประเมินผล', icon: ClipboardCheck },
         { id: 'reports', label: 'รายงาน & Export', icon: FileText },
-        { id: 'templates', label: 'เกณฑ์ 13 ตำแหน่ง', icon: Award },
+        { id: 'templates', label: 'เกณฑ์ 14 ตำแหน่ง (3 กลุ่ม)', icon: Award },
       ];
     } else {
       // Staff (Evaluatee)
       return [
         { id: 'my_evaluation', label: 'ผลการประเมินของฉัน', icon: Award },
-        { id: 'templates', label: 'เกณฑ์มาตรฐาน 13 ตำแหน่ง', icon: Layers },
+        { id: 'templates', label: 'เกณฑ์มาตรฐาน 14 ตำแหน่ง', icon: Layers },
       ];
     }
   };

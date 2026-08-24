@@ -554,6 +554,22 @@ export const INITIAL_USERS: User[] = [
     email: 'namoy.k@chainat-special.ac.th',
     employeeCode: 'S-067',
   },
+
+  // --- กลุ่มที่ 3: พนักงานราชการทั่วไป ตำแหน่ง ครูผู้สอน ---
+  {
+    id: 'staff_gov_1',
+    name: 'นายณัฐพล บุญรักษา',
+    username: 'nattapon',
+    password: 'password123',
+    position: 'พนักงานราชการทั่วไป ตำแหน่งครูผู้สอน',
+    positionGroup: 'government_employee_teacher',
+    formTemplateId: 'form_government_employee_teacher',
+    department: 'กลุ่มงานการศึกษาพิเศษและการจัดการเรียนรู้',
+    role: 'staff',
+    email: 'nattapon.b@chainat-special.ac.th',
+    employeeCode: 'G-001',
+    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=256',
+  },
 ];
 
 export const INITIAL_COMMITTEE_GROUPS: CommitteeGroup[] = [
@@ -607,6 +623,16 @@ export const INITIAL_COMMITTEE_GROUPS: CommitteeGroup[] = [
       'support_16',
       'support_17',
     ],
+    createdAt: '2026-08-17T08:30:00.000Z',
+  },
+  {
+    id: 'group_3',
+    name: 'คณะกรรมการประเมินผล ชุดที่ 3 (พนักงานราชการทั่วไป ตำแหน่ง ครูผู้สอน)',
+    targetPositionGroup: 'government_employee_teacher',
+    description:
+      'หน้าที่: ประเมินผลการปฏิบัติงานพนักงานราชการทั่วไป ตำแหน่งครูผู้สอน ตามสมรรถนะหลัก 5 ด้าน และสมรรถนะประจำสายงาน 2 ด้าน',
+    evaluatorIds: ['evaluator_1', 'evaluator_director', 'evaluator_2'],
+    assignedEvaluateeIds: ['staff_gov_1'],
     createdAt: '2026-08-17T08:30:00.000Z',
   },
 ];

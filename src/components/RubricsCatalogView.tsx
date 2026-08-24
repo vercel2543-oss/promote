@@ -17,6 +17,7 @@ export const RubricsCatalogView: React.FC = () => {
 
   const teacherForms = formTemplates.filter((t) => t.group === 'teacher_assistant');
   const supportForms = formTemplates.filter((t) => t.group === 'support_staff');
+  const govTeacherForms = formTemplates.filter((t) => t.group === 'government_employee_teacher');
 
   const handleStartEvaluateWithForm = (formId: string) => {
     setSelectedFormId(formId);
@@ -32,35 +33,35 @@ export const RubricsCatalogView: React.FC = () => {
           <div className="flex items-center gap-2">
             <BookOpen className="w-6 h-6 text-blue-700" />
             <h2 className="text-xl font-bold text-slate-900">
-              คลังเกณฑ์การประเมิน 13 ตำแหน่งงาน (Official Rubrics Standard)
+              คลังเกณฑ์การประเมินตำแหน่งงาน (Official Rubrics Standard)
             </h2>
           </div>
           <p className="text-xs sm:text-sm text-slate-500 mt-1">
-            เกณฑ์มาตรฐานตัวชี้วัดผลสัมฤทธิ์และคุณลักษณะเฉพาะตำแหน่ง จำแนกตาม 2 กลุ่มหลัก
+            เกณฑ์มาตรฐานตัวชี้วัดผลสัมฤทธิ์และคุณลักษณะเฉพาะตำแหน่ง จำแนกตาม 3 กลุ่มหลัก
           </p>
         </div>
 
-        <div className="flex items-center gap-2 text-xs font-semibold text-blue-700 bg-blue-50 px-3 py-1.5 rounded-xl border border-blue-200">
+        <div className="flex items-center gap-2 text-xs font-semibold text-purple-700 bg-purple-50 px-3 py-1.5 rounded-xl border border-purple-200">
           <Award className="w-4 h-4" />
-          <span>ครบถ้วน 13 ตำแหน่ง 100% ตามระเบียบราชการ</span>
+          <span>ครอบคลุมครบทุกกลุ่มสายงาน 100% ตามระเบียบราชการ</span>
         </div>
       </div>
 
       {/* Main 2-Column Catalog Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
-        {/* Left Column: Form Selector List (13 positions) */}
+        {/* Left Column: Form Selector List */}
         <div className="lg:col-span-5 space-y-4">
           
           {/* Group 1 */}
           <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-purple-700 mb-2 flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-purple-600" />
+            <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-700 mb-2 flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-600" />
               <span>กลุ่มที่ 1: ลูกจ้างชั่วคราว ตำแหน่งครูผู้ช่วย</span>
             </h3>
             <div className="space-y-1.5">
               {teacherForms.map((t) => {
-                const isSelected = selectedTemplate.id === t.id;
+                const isSelected = selectedTemplate?.id === t.id;
                 return (
                   <button
                     key={t.id}
@@ -82,15 +83,47 @@ export const RubricsCatalogView: React.FC = () => {
             </div>
           </div>
 
+          {/* Group 3: พนักงานราชการทั่วไป ตำแหน่ง ครูผู้สอน */}
+          {govTeacherForms.length > 0 && (
+            <div className="bg-white rounded-2xl border border-purple-200 p-4 shadow-xs">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-purple-700 mb-2 flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-purple-600" />
+                <span>กลุ่มที่ 3: พนักงานราชการทั่วไป ตำแหน่ง ครูผู้สอน</span>
+              </h3>
+              <div className="space-y-1.5">
+                {govTeacherForms.map((t) => {
+                  const isSelected = selectedTemplate?.id === t.id;
+                  return (
+                    <button
+                      key={t.id}
+                      onClick={() => setSelectedTemplate(t)}
+                      className={`w-full text-left p-3 rounded-xl border transition cursor-pointer flex items-center justify-between ${
+                        isSelected
+                          ? 'bg-purple-700 text-white border-purple-700 shadow-xs'
+                          : 'bg-purple-50/40 hover:bg-purple-50 border-purple-100 text-slate-800'
+                      }`}
+                    >
+                      <div>
+                        <div className="text-xs font-mono font-bold opacity-80">{t.code}</div>
+                        <div className="text-xs sm:text-sm font-bold">{t.title}</div>
+                      </div>
+                      <ChevronRight className={`w-4 h-4 ${isSelected ? 'text-white' : 'text-purple-400'}`} />
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Group 2 */}
           <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs">
             <h3 className="text-xs font-bold uppercase tracking-wider text-blue-700 mb-2 flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-blue-600" />
               <span>กลุ่มที่ 2: ลูกจ้างชั่วคราว สายสนับสนุน/ปฏิบัติงาน (12 ตำแหน่ง)</span>
             </h3>
-            <div className="space-y-1.5 max-h-[500px] overflow-y-auto pr-1">
+            <div className="space-y-1.5 max-h-[420px] overflow-y-auto pr-1">
               {supportForms.map((t) => {
-                const isSelected = selectedTemplate.id === t.id;
+                const isSelected = selectedTemplate?.id === t.id;
                 return (
                   <button
                     key={t.id}

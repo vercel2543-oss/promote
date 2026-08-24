@@ -182,8 +182,19 @@ export const UserManagementView: React.FC = () => {
     const matchesRole = roleFilter === 'all' || user.role === roleFilter;
     const matchesGroup =
       groupFilter === 'all' ||
-      (groupFilter === 'teacher_assistant' && user.position.includes('ครูผู้ช่วย')) ||
-      (groupFilter === 'support_staff' && user.role === 'staff' && !user.position.includes('ครูผู้ช่วย'));
+      (groupFilter === 'teacher_assistant' &&
+        (user.positionGroup === 'teacher_assistant' ||
+          (user.position.includes('ครูผู้ช่วย') && !user.position.includes('พนักงานราชการ')))) ||
+      (groupFilter === 'government_employee_teacher' &&
+        (user.positionGroup === 'government_employee_teacher' ||
+          user.position.includes('พนักงานราชการ') ||
+          (user.position.includes('ครูผู้สอน') && !user.position.includes('ครูผู้ช่วย')))) ||
+      (groupFilter === 'support_staff' &&
+        user.role === 'staff' &&
+        !user.position.includes('ครูผู้ช่วย') &&
+        !user.position.includes('พนักงานราชการ') &&
+        user.positionGroup !== 'teacher_assistant' &&
+        user.positionGroup !== 'government_employee_teacher');
 
     return matchesSearch && matchesRole && matchesGroup;
   });
@@ -609,7 +620,7 @@ export const UserManagementView: React.FC = () => {
                     onChange={(e) => setFormData({ ...formData, formTemplateId: e.target.value })}
                     className="w-full px-3 py-2.5 text-xs sm:text-sm border border-indigo-300 rounded-xl focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/20 outline-none bg-white font-medium text-slate-900"
                   >
-                    <optgroup label="กลุ่มที่ 1: ครูผู้ช่วย (ลูกจ้างชั่วคราว)">
+                    <optgroup label="กลุ่มที่ 1: ลูกจ้างชั่วคราว ตำแหน่ง ครูผู้ช่วย">
                       {formTemplates
                         .filter((t) => t.group === 'teacher_assistant')
                         .map((t) => (
@@ -618,7 +629,7 @@ export const UserManagementView: React.FC = () => {
                           </option>
                         ))}
                     </optgroup>
-                    <optgroup label="กลุ่มที่ 2: สายสนับสนุน/ปฏิบัติงาน (12 ตำแหน่ง)">
+                    <optgroup label="กลุ่มที่ 2: ลูกจ้างชั่วคราว สายสนับสนุน/ปฏิบัติงาน (12 ตำแหน่ง)">
                       {formTemplates
                         .filter((t) => t.group === 'support_staff')
                         .map((t) => (
@@ -627,10 +638,29 @@ export const UserManagementView: React.FC = () => {
                           </option>
                         ))}
                     </optgroup>
-                    {formTemplates.some((t) => t.group !== 'teacher_assistant' && t.group !== 'support_staff') && (
+                    <optgroup label="กลุ่มที่ 3: พนักงานราชการทั่วไป ตำแหน่ง ครูผู้สอน">
+                      {formTemplates
+                        .filter((t) => t.group === 'government_employee_teacher')
+                        .map((t) => (
+                          <option key={t.id} value={t.id}>
+                            [{t.code}] {t.title} ({t.totalMaxScore} คะแนน)
+                          </option>
+                        ))}
+                    </optgroup>
+                    {formTemplates.some(
+                      (t) =>
+                        t.group !== 'teacher_assistant' &&
+                        t.group !== 'support_staff' &&
+                        t.group !== 'government_employee_teacher'
+                    ) && (
                       <optgroup label="แบบฟอร์มอื่นๆ">
                         {formTemplates
-                          .filter((t) => t.group !== 'teacher_assistant' && t.group !== 'support_staff')
+                          .filter(
+                            (t) =>
+                              t.group !== 'teacher_assistant' &&
+                              t.group !== 'support_staff' &&
+                              t.group !== 'government_employee_teacher'
+                          )
                           .map((t) => (
                             <option key={t.id} value={t.id}>
                               [{t.code}] {t.title} ({t.totalMaxScore} คะแนน)
@@ -871,7 +901,7 @@ export const UserManagementView: React.FC = () => {
                     onChange={(e) => setFormData({ ...formData, formTemplateId: e.target.value })}
                     className="w-full px-3 py-2.5 text-xs sm:text-sm border border-indigo-300 rounded-xl focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/20 outline-none bg-white font-semibold text-slate-900 shadow-2xs"
                   >
-                    <optgroup label="กลุ่มที่ 1: ครูผู้ช่วย (ลูกจ้างชั่วคราว)">
+                    <optgroup label="กลุ่มที่ 1: ลูกจ้างชั่วคราว ตำแหน่ง ครูผู้ช่วย">
                       {formTemplates
                         .filter((t) => t.group === 'teacher_assistant')
                         .map((t) => (
@@ -880,7 +910,7 @@ export const UserManagementView: React.FC = () => {
                           </option>
                         ))}
                     </optgroup>
-                    <optgroup label="กลุ่มที่ 2: สายสนับสนุน/ปฏิบัติงาน (12 ตำแหน่ง)">
+                    <optgroup label="กลุ่มที่ 2: ลูกจ้างชั่วคราว สายสนับสนุน/ปฏิบัติงาน (12 ตำแหน่ง)">
                       {formTemplates
                         .filter((t) => t.group === 'support_staff')
                         .map((t) => (
@@ -889,10 +919,29 @@ export const UserManagementView: React.FC = () => {
                           </option>
                         ))}
                     </optgroup>
-                    {formTemplates.some((t) => t.group !== 'teacher_assistant' && t.group !== 'support_staff') && (
+                    <optgroup label="กลุ่มที่ 3: พนักงานราชการทั่วไป ตำแหน่ง ครูผู้สอน">
+                      {formTemplates
+                        .filter((t) => t.group === 'government_employee_teacher')
+                        .map((t) => (
+                          <option key={t.id} value={t.id}>
+                            [{t.code}] {t.title} ({t.totalMaxScore} คะแนน)
+                          </option>
+                        ))}
+                    </optgroup>
+                    {formTemplates.some(
+                      (t) =>
+                        t.group !== 'teacher_assistant' &&
+                        t.group !== 'support_staff' &&
+                        t.group !== 'government_employee_teacher'
+                    ) && (
                       <optgroup label="แบบฟอร์มอื่นๆ">
                         {formTemplates
-                          .filter((t) => t.group !== 'teacher_assistant' && t.group !== 'support_staff')
+                          .filter(
+                            (t) =>
+                              t.group !== 'teacher_assistant' &&
+                              t.group !== 'support_staff' &&
+                              t.group !== 'government_employee_teacher'
+                          )
                           .map((t) => (
                             <option key={t.id} value={t.id}>
                               [{t.code}] {t.title} ({t.totalMaxScore} คะแนน)
