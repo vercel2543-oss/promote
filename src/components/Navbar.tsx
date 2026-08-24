@@ -250,7 +250,7 @@ export const Navbar: React.FC = () => {
                   {/* User Avatar (Photo if uploaded, else initial) */}
                   <div
                     className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs text-white shadow-xs overflow-hidden ${
-                      currentUser?.avatarUrl
+                      (currentUser?.avatar || currentUser?.avatarUrl)
                         ? 'border border-white/60'
                         : currentUser?.role === 'admin'
                         ? 'bg-purple-600'
@@ -259,9 +259,9 @@ export const Navbar: React.FC = () => {
                         : 'bg-emerald-600'
                     }`}
                   >
-                    {currentUser?.avatarUrl ? (
+                    {(currentUser?.avatar || currentUser?.avatarUrl) ? (
                       <img
-                        src={currentUser.avatarUrl}
+                        src={currentUser.avatar || currentUser.avatarUrl}
                         alt={currentUser.name}
                         className="w-full h-full object-cover"
                       />
@@ -415,8 +415,8 @@ export const Navbar: React.FC = () => {
             <div className="p-5 bg-gradient-to-r from-blue-700 to-indigo-800 text-white flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center font-bold text-base text-amber-300 overflow-hidden">
-                  {currentUser?.avatarUrl ? (
-                    <img src={currentUser.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                  {(currentUser?.avatar || currentUser?.avatarUrl) ? (
+                    <img src={currentUser.avatar || currentUser.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
                   ) : (
                     currentUser?.name?.charAt(0)
                   )}

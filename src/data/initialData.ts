@@ -659,9 +659,9 @@ export const INITIAL_SUBMISSIONS: EvaluationSubmission[] = [
     supervisorMentorName: 'นางพนิดา สมบูรณ์ชัย (ครูชำนาญการพิเศษ)',
     leaveStats: {
       late: { days: 0, times: 0 },
-      sickAndPersonal: { days: 1, times: 1 },
+      sick: { days: 1, times: 1 },
+      personal: { days: 0, times: 0 },
       maternity: { days: 0, times: 0 },
-      extendedSick: { days: 0, times: 0 },
       ordinationOrHajj: { days: 0, times: 0 },
       absent: { days: 0, times: 0 },
       other: { days: 0, times: 0 },

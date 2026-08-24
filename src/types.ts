@@ -28,11 +28,13 @@ export interface User {
   role: UserRole;
   positionGroup?: PositionGroup; // กลุ่มที่ 1: teacher_assistant, กลุ่มที่ 2: support_staff
   email: string;
+  avatar?: string; // Uploaded profile picture (base64 or URL)
   avatarUrl?: string;
   groupId?: string; // ID of assigned committee group
   phone?: string;
   employeeCode?: string; // รหัสพนักงาน
-  formTemplateId?: string; // รหัสแบบฟอร์มการประเมินที่กำหนดเฉพาะบุคคล (Assigned Evaluation Form Template ID)
+  formTemplateId?: string; // รหัสแบบฟอร์มการประเมินที่กำหนดเฉพาะบุคคล
+  leaveStats?: LeaveStats; // สถิติการมาทำงานและการลาที่แอดมินบันทึกไว้ล่วงหน้า
 }
 
 export interface CommitteeGroup {
@@ -89,13 +91,16 @@ export interface LeaveStatItem {
 
 export interface LeaveStats {
   late: LeaveStatItem; // มาสาย
-  sickAndPersonal: LeaveStatItem; // ลาป่วย และลากิจส่วนตัว
+  sick: LeaveStatItem; // ลาป่วย
+  personal: LeaveStatItem; // ลากิจส่วนตัว
   maternity: LeaveStatItem; // ลาคลอดบุตร
-  extendedSick: LeaveStatItem; // ลาป่วยต้องรักษาตัวเป็นเวลานาน
   ordinationOrHajj: LeaveStatItem; // ลาอุปสมบท / ประกอบพิธีฮัจย์
   absent: LeaveStatItem; // ขาดราชการ
   other: LeaveStatItem; // อื่น ๆ
   notes?: string;
+  // For backward compatibility:
+  sickAndPersonal?: LeaveStatItem;
+  extendedSick?: LeaveStatItem;
 }
 
 export interface DetailedComments {

@@ -118,9 +118,9 @@ export const EvaluateeCard: React.FC<EvaluateeCardProps> = ({
           <div className="flex items-start gap-3 min-w-0">
             {/* Avatar Circle */}
             <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-teal-500 to-emerald-600 text-white flex items-center justify-center text-lg font-bold shadow-xs shrink-0 overflow-hidden group-hover/header:scale-105 transition-transform">
-              {evaluatee.avatarUrl ? (
+              {(evaluatee.avatar || evaluatee.avatarUrl) ? (
                 <img
-                  src={evaluatee.avatarUrl}
+                  src={evaluatee.avatar || evaluatee.avatarUrl}
                   alt={evaluatee.name}
                   className="w-full h-full object-cover"
                 />

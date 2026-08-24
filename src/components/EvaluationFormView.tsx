@@ -69,20 +69,21 @@ export const EvaluationFormView: React.FC<EvaluationFormViewProps> = ({ onEvalua
   const [scores, setScores] = useState<Record<string, number>>({});
   const [positionNumber, setPositionNumber] = useState('พ-1042');
   const [startDate, setStartDate] = useState('2024-05-15');
-  const [workplaceLocation, setWorkplaceLocation] = useState('กลุ่มสาระการเรียนรู้คณิตศาสตร์ อาคาร 3');
-  const [supervisorMentorName, setSupervisorMentorName] = useState('นางสมศรี ภักดีธรรม (ครูชำนาญการพิเศษ)');
 
-  // Leave Stats
-  const [leaveStats, setLeaveStats] = useState<LeaveStats>({
+  // Leave Stats (7 Categories: มาสาย, ลาป่วย, ลากิจส่วนตัว, ลาคลอดบุตร, ลาอุปสมบท/ฮัจย์, ขาดราชการ, อื่น ๆ)
+  const defaultLeaveStats: LeaveStats = {
     late: { days: 0, times: 0 },
-    sickAndPersonal: { days: 0, times: 0 },
+    sick: { days: 0, times: 0 },
+    personal: { days: 0, times: 0 },
     maternity: { days: 0, times: 0 },
-    extendedSick: { days: 0, times: 0 },
     ordinationOrHajj: { days: 0, times: 0 },
     absent: { days: 0, times: 0 },
     other: { days: 0, times: 0 },
     notes: '',
-  });
+  };
+
+  const [leaveStats, setLeaveStats] = useState<LeaveStats>(defaultLeaveStats);
+  const [isLeaveStatsFromAdmin, setIsLeaveStatsFromAdmin] = useState(false);
 
   // Comments (Standard & Detailed)
   const [strengths, setStrengths] = useState('');
@@ -110,6 +111,20 @@ export const EvaluationFormView: React.FC<EvaluationFormViewProps> = ({ onEvalua
   useEffect(() => {
     if (!currentEvaluatee || !currentForm) return;
 
+    // Check if evaluatee has pre-filled leave stats from Admin
+    const prefilledStats = currentEvaluatee.leaveStats
+      ? {
+          late: currentEvaluatee.leaveStats.late || { days: 0, times: 0 },
+          sick: currentEvaluatee.leaveStats.sick || { days: 0, times: 0 },
+          personal: currentEvaluatee.leaveStats.personal || { days: 0, times: 0 },
+          maternity: currentEvaluatee.leaveStats.maternity || { days: 0, times: 0 },
+          ordinationOrHajj: currentEvaluatee.leaveStats.ordinationOrHajj || { days: 0, times: 0 },
+          absent: currentEvaluatee.leaveStats.absent || { days: 0, times: 0 },
+          other: currentEvaluatee.leaveStats.other || { days: 0, times: 0 },
+          notes: currentEvaluatee.leaveStats.notes || '',
+        }
+      : null;
+
     // 1. Check if user already submitted for this candidate
     const existingSubmission = submissions.find(
       (s) =>
@@ -120,11 +135,24 @@ export const EvaluationFormView: React.FC<EvaluationFormViewProps> = ({ onEvalua
 
     if (existingSubmission) {
       setScores(existingSubmission.scores);
-      setPositionNumber(existingSubmission.positionNumber || 'พ-1042');
+      setPositionNumber(existingSubmission.positionNumber || currentEvaluatee.employeeCode || 'พ-1042');
       setStartDate(existingSubmission.startDate || '2024-05-15');
-      setWorkplaceLocation(existingSubmission.workplaceLocation || 'กลุ่มสาระการเรียนรู้คณิตศาสตร์ อาคาร 3');
-      setSupervisorMentorName(existingSubmission.supervisorMentorName || 'นางสมศรี ภักดีธรรม');
-      if (existingSubmission.leaveStats) setLeaveStats(existingSubmission.leaveStats);
+      if (existingSubmission.leaveStats) {
+        setLeaveStats({
+          late: existingSubmission.leaveStats.late || { days: 0, times: 0 },
+          sick: existingSubmission.leaveStats.sick || existingSubmission.leaveStats.sickAndPersonal || { days: 0, times: 0 },
+          personal: existingSubmission.leaveStats.personal || { days: 0, times: 0 },
+          maternity: existingSubmission.leaveStats.maternity || { days: 0, times: 0 },
+          ordinationOrHajj: existingSubmission.leaveStats.ordinationOrHajj || { days: 0, times: 0 },
+          absent: existingSubmission.leaveStats.absent || { days: 0, times: 0 },
+          other: existingSubmission.leaveStats.other || { days: 0, times: 0 },
+          notes: existingSubmission.leaveStats.notes || '',
+        });
+        setIsLeaveStatsFromAdmin(false);
+      } else if (prefilledStats) {
+        setLeaveStats(prefilledStats);
+        setIsLeaveStatsFromAdmin(true);
+      }
       
       const c = existingSubmission.comments;
       setStrengths(c.strengths || '');
@@ -150,10 +178,24 @@ export const EvaluationFormView: React.FC<EvaluationFormViewProps> = ({ onEvalua
     const draft = getDraftEvaluation(currentEvaluatee.id, currentForm.id);
     if (draft) {
       setScores(draft.scores || {});
-      setPositionNumber(draft.positionNumber || 'พ-1042');
+      setPositionNumber(draft.positionNumber || currentEvaluatee.employeeCode || 'พ-1042');
       setStartDate(draft.startDate || '2024-05-15');
-      setWorkplaceLocation(draft.workplaceLocation || 'กลุ่มสาระการเรียนรู้คณิตศาสตร์ อาคาร 3');
-      if (draft.leaveStats) setLeaveStats(draft.leaveStats);
+      if (draft.leaveStats) {
+        setLeaveStats({
+          late: draft.leaveStats.late || { days: 0, times: 0 },
+          sick: draft.leaveStats.sick || draft.leaveStats.sickAndPersonal || { days: 0, times: 0 },
+          personal: draft.leaveStats.personal || { days: 0, times: 0 },
+          maternity: draft.leaveStats.maternity || { days: 0, times: 0 },
+          ordinationOrHajj: draft.leaveStats.ordinationOrHajj || { days: 0, times: 0 },
+          absent: draft.leaveStats.absent || { days: 0, times: 0 },
+          other: draft.leaveStats.other || { days: 0, times: 0 },
+          notes: draft.leaveStats.notes || '',
+        });
+        setIsLeaveStatsFromAdmin(false);
+      } else if (prefilledStats) {
+        setLeaveStats(prefilledStats);
+        setIsLeaveStatsFromAdmin(true);
+      }
 
       const c = draft.comments || {};
       setStrengths(c.strengths || '');
@@ -178,6 +220,15 @@ export const EvaluationFormView: React.FC<EvaluationFormViewProps> = ({ onEvalua
 
     // 3. Default clean form
     setScores({});
+    setPositionNumber(currentEvaluatee.employeeCode || 'พ-1042');
+    setStartDate('2024-05-15');
+    if (prefilledStats) {
+      setLeaveStats(prefilledStats);
+      setIsLeaveStatsFromAdmin(true);
+    } else {
+      setLeaveStats(defaultLeaveStats);
+      setIsLeaveStatsFromAdmin(false);
+    }
     setStrengths('');
     setImprovements('');
     setGeneralComment('');
@@ -190,7 +241,7 @@ export const EvaluationFormView: React.FC<EvaluationFormViewProps> = ({ onEvalua
     setRecommendationDecision('continue');
     setRecommendationReason('');
     setSignatureDataUrl('');
-  }, [currentEvaluatee?.id, currentForm?.id, currentUser.id, submissions]);
+  }, [currentEvaluatee?.id, currentEvaluatee?.leaveStats, currentForm?.id, currentUser.id, submissions]);
 
   // Real-time calculation
   const calculated = calculateSubmissionScores(currentForm, scores, gradeThresholds);
@@ -221,8 +272,6 @@ export const EvaluationFormView: React.FC<EvaluationFormViewProps> = ({ onEvalua
       evaluatorPosition: currentUser.position,
       positionNumber,
       startDate,
-      workplaceLocation,
-      supervisorMentorName,
       leaveStats,
       scores: updated,
       categoryScores: calculated.categoryScores,
@@ -327,8 +376,6 @@ export const EvaluationFormView: React.FC<EvaluationFormViewProps> = ({ onEvalua
         evaluatorPosition: currentUser.position,
         positionNumber,
         startDate,
-        workplaceLocation,
-        supervisorMentorName,
         leaveStats,
         scores,
         categoryScores: calculated.categoryScores,
@@ -619,8 +666,8 @@ export const EvaluationFormView: React.FC<EvaluationFormViewProps> = ({ onEvalua
           </div>
 
           <div className="p-5 sm:p-6 space-y-6">
-            {/* General Profile fields */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs sm:text-sm">
+            {/* General Profile fields - Removed workplaceLocation & supervisorMentorName as requested */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs sm:text-sm">
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">ตำแหน่งเลขที่:</label>
                 <input
@@ -639,33 +686,27 @@ export const EvaluationFormView: React.FC<EvaluationFormViewProps> = ({ onEvalua
                   className="w-full p-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 text-xs"
                 />
               </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">สถานที่ปฏิบัติงาน:</label>
-                <input
-                  type="text"
-                  value={workplaceLocation}
-                  onChange={(e) => setWorkplaceLocation(e.target.value)}
-                  className="w-full p-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 text-xs"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">ผู้ควบคุมการปฏิบัติงาน:</label>
-                <input
-                  type="text"
-                  value={supervisorMentorName}
-                  onChange={(e) => setSupervisorMentorName(e.target.value)}
-                  className="w-full p-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 text-xs"
-                />
-              </div>
             </div>
 
-            {/* Leave statistics Table */}
-            <div className="space-y-2">
-              <label className="block text-xs font-bold text-slate-800">
-                สถิติการมาทำงาน การลา และการมาสายในรอบการประเมิน (1 ต.ค. – 31 มี.ค. หรือ 1 เม.ย. – 30 ก.ย.):
-              </label>
+            {/* Leave statistics Table - 7 categories with Days / Times */}
+            <div className="space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <label className="block text-xs font-bold text-slate-800">
+                  สถิติการมาทำงาน การลา และการมาสายในรอบการประเมิน:
+                </label>
+                {isLeaveStatsFromAdmin ? (
+                  <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 shadow-2xs">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    ดึงข้อมูลสถิติวันลาที่แอดมินบันทึกไว้ล่วงหน้าอัตโนมัติ
+                  </span>
+                ) : (
+                  <span className="text-[11px] text-slate-500">
+                    กรรมการสามารถตรวจสอบและปรับแก้จำนวนวัน/ครั้งได้ตามจริง
+                  </span>
+                )}
+              </div>
               
-              <div className="overflow-x-auto border border-slate-200 rounded-xl">
+              <div className="overflow-x-auto border border-slate-200 rounded-xl shadow-2xs">
                 <table className="w-full text-left text-xs">
                   <thead className="bg-slate-50 text-slate-700 font-semibold border-b border-slate-200">
                     <tr>
@@ -676,104 +717,180 @@ export const EvaluationFormView: React.FC<EvaluationFormViewProps> = ({ onEvalua
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    <tr>
-                      <td className="p-3 font-medium text-slate-900">1. การมาสาย</td>
+                    {/* 1. มาสาย */}
+                    <tr className="hover:bg-slate-50/50">
+                      <td className="p-3 font-medium text-slate-900">1. มาสาย</td>
                       <td className="p-2 text-center">
                         <input
                           type="number"
                           min="0"
-                          value={leaveStats.late.days}
+                          value={leaveStats.late?.days ?? 0}
                           onChange={(e) => setLeaveStats({ ...leaveStats, late: { ...leaveStats.late, days: Number(e.target.value) } })}
-                          className="w-20 p-1.5 text-center border border-slate-300 rounded-lg text-xs"
+                          className="w-20 p-1.5 text-center border border-slate-300 rounded-lg text-xs focus:ring-1 focus:ring-blue-500"
                         />
                       </td>
                       <td className="p-2 text-center">
                         <input
                           type="number"
                           min="0"
-                          value={leaveStats.late.times}
+                          value={leaveStats.late?.times ?? 0}
                           onChange={(e) => setLeaveStats({ ...leaveStats, late: { ...leaveStats.late, times: Number(e.target.value) } })}
-                          className="w-20 p-1.5 text-center border border-slate-300 rounded-lg text-xs"
+                          className="w-20 p-1.5 text-center border border-slate-300 rounded-lg text-xs focus:ring-1 focus:ring-blue-500"
                         />
                       </td>
                       <td className="p-2">
                         <input
                           type="text"
-                          placeholder="ระบุเหตุผลการมาสาย..."
+                          placeholder="ระบุเหตุผลหรือหมายเหตุ..."
                           value={leaveStats.notes || ''}
                           onChange={(e) => setLeaveStats({ ...leaveStats, notes: e.target.value })}
-                          className="w-full p-1.5 border border-slate-300 rounded-lg text-xs"
+                          className="w-full p-1.5 border border-slate-300 rounded-lg text-xs focus:ring-1 focus:ring-blue-500"
                         />
                       </td>
                     </tr>
 
-                    <tr>
-                      <td className="p-3 font-medium text-slate-900">2. ลาป่วยและลากิจส่วนตัว</td>
+                    {/* 2. ลาป่วย */}
+                    <tr className="hover:bg-slate-50/50">
+                      <td className="p-3 font-medium text-slate-900">2. ลาป่วย</td>
                       <td className="p-2 text-center">
                         <input
                           type="number"
                           min="0"
-                          value={leaveStats.sickAndPersonal.days}
-                          onChange={(e) => setLeaveStats({ ...leaveStats, sickAndPersonal: { ...leaveStats.sickAndPersonal, days: Number(e.target.value) } })}
-                          className="w-20 p-1.5 text-center border border-slate-300 rounded-lg text-xs"
+                          value={leaveStats.sick?.days ?? 0}
+                          onChange={(e) => setLeaveStats({ ...leaveStats, sick: { ...leaveStats.sick, days: Number(e.target.value) } })}
+                          className="w-20 p-1.5 text-center border border-slate-300 rounded-lg text-xs focus:ring-1 focus:ring-blue-500"
                         />
                       </td>
                       <td className="p-2 text-center">
                         <input
                           type="number"
                           min="0"
-                          value={leaveStats.sickAndPersonal.times}
-                          onChange={(e) => setLeaveStats({ ...leaveStats, sickAndPersonal: { ...leaveStats.sickAndPersonal, times: Number(e.target.value) } })}
-                          className="w-20 p-1.5 text-center border border-slate-300 rounded-lg text-xs"
+                          value={leaveStats.sick?.times ?? 0}
+                          onChange={(e) => setLeaveStats({ ...leaveStats, sick: { ...leaveStats.sick, times: Number(e.target.value) } })}
+                          className="w-20 p-1.5 text-center border border-slate-300 rounded-lg text-xs focus:ring-1 focus:ring-blue-500"
                         />
                       </td>
-                      <td className="p-2 text-slate-500 italic text-[11px]">ไม่เกิน 15 วันทำการต่อปี</td>
+                      <td className="p-2 text-slate-500 italic text-[11px]">ลาป่วยตามสิทธิการจ้าง</td>
                     </tr>
 
-                    <tr>
-                      <td className="p-3 font-medium text-slate-900">3. ลาคลอดบุตร</td>
+                    {/* 3. ลากิจส่วนตัว */}
+                    <tr className="hover:bg-slate-50/50">
+                      <td className="p-3 font-medium text-slate-900">3. ลากิจส่วนตัว</td>
                       <td className="p-2 text-center">
                         <input
                           type="number"
                           min="0"
-                          value={leaveStats.maternity.days}
+                          value={leaveStats.personal?.days ?? 0}
+                          onChange={(e) => setLeaveStats({ ...leaveStats, personal: { ...leaveStats.personal, days: Number(e.target.value) } })}
+                          className="w-20 p-1.5 text-center border border-slate-300 rounded-lg text-xs focus:ring-1 focus:ring-blue-500"
+                        />
+                      </td>
+                      <td className="p-2 text-center">
+                        <input
+                          type="number"
+                          min="0"
+                          value={leaveStats.personal?.times ?? 0}
+                          onChange={(e) => setLeaveStats({ ...leaveStats, personal: { ...leaveStats.personal, times: Number(e.target.value) } })}
+                          className="w-20 p-1.5 text-center border border-slate-300 rounded-lg text-xs focus:ring-1 focus:ring-blue-500"
+                        />
+                      </td>
+                      <td className="p-2 text-slate-500 italic text-[11px]">ลากิจส่วนตัวตามระเบียบ</td>
+                    </tr>
+
+                    {/* 4. ลาคลอดบุตร */}
+                    <tr className="hover:bg-slate-50/50">
+                      <td className="p-3 font-medium text-slate-900">4. ลาคลอดบุตร</td>
+                      <td className="p-2 text-center">
+                        <input
+                          type="number"
+                          min="0"
+                          value={leaveStats.maternity?.days ?? 0}
                           onChange={(e) => setLeaveStats({ ...leaveStats, maternity: { ...leaveStats.maternity, days: Number(e.target.value) } })}
-                          className="w-20 p-1.5 text-center border border-slate-300 rounded-lg text-xs"
+                          className="w-20 p-1.5 text-center border border-slate-300 rounded-lg text-xs focus:ring-1 focus:ring-blue-500"
                         />
                       </td>
                       <td className="p-2 text-center">
                         <input
                           type="number"
                           min="0"
-                          value={leaveStats.maternity.times}
+                          value={leaveStats.maternity?.times ?? 0}
                           onChange={(e) => setLeaveStats({ ...leaveStats, maternity: { ...leaveStats.maternity, times: Number(e.target.value) } })}
-                          className="w-20 p-1.5 text-center border border-slate-300 rounded-lg text-xs"
+                          className="w-20 p-1.5 text-center border border-slate-300 rounded-lg text-xs focus:ring-1 focus:ring-blue-500"
                         />
                       </td>
-                      <td className="p-2 text-slate-500 italic text-[11px]">ตามสิทธิการลาคลอด</td>
+                      <td className="p-2 text-slate-500 italic text-[11px]">ตามสิทธิการลาคลอดบุตร</td>
                     </tr>
 
-                    <tr>
-                      <td className="p-3 font-medium text-slate-900">4. ขาดราชการ / ขาดงาน</td>
+                    {/* 5. ลาอุปสมบท / ประกอบพิธีฮัจย์ */}
+                    <tr className="hover:bg-slate-50/50">
+                      <td className="p-3 font-medium text-slate-900">5. ลาอุปสมบท / ประกอบพิธีฮัจย์</td>
                       <td className="p-2 text-center">
                         <input
                           type="number"
                           min="0"
-                          value={leaveStats.absent.days}
-                          onChange={(e) => setLeaveStats({ ...leaveStats, absent: { ...leaveStats.absent, days: Number(e.target.value) } })}
-                          className="w-20 p-1.5 text-center border border-slate-300 rounded-lg text-xs"
+                          value={leaveStats.ordinationOrHajj?.days ?? 0}
+                          onChange={(e) => setLeaveStats({ ...leaveStats, ordinationOrHajj: { ...leaveStats.ordinationOrHajj, days: Number(e.target.value) } })}
+                          className="w-20 p-1.5 text-center border border-slate-300 rounded-lg text-xs focus:ring-1 focus:ring-blue-500"
                         />
                       </td>
                       <td className="p-2 text-center">
                         <input
                           type="number"
                           min="0"
-                          value={leaveStats.absent.times}
+                          value={leaveStats.ordinationOrHajj?.times ?? 0}
+                          onChange={(e) => setLeaveStats({ ...leaveStats, ordinationOrHajj: { ...leaveStats.ordinationOrHajj, times: Number(e.target.value) } })}
+                          className="w-20 p-1.5 text-center border border-slate-300 rounded-lg text-xs focus:ring-1 focus:ring-blue-500"
+                        />
+                      </td>
+                      <td className="p-2 text-slate-500 italic text-[11px]">ตามระเบียบการลาทางศาสนา</td>
+                    </tr>
+
+                    {/* 6. ขาดราชการ */}
+                    <tr className="hover:bg-slate-50/50">
+                      <td className="p-3 font-medium text-slate-900">6. ขาดราชการ</td>
+                      <td className="p-2 text-center">
+                        <input
+                          type="number"
+                          min="0"
+                          value={leaveStats.absent?.days ?? 0}
+                          onChange={(e) => setLeaveStats({ ...leaveStats, absent: { ...leaveStats.absent, days: Number(e.target.value) } })}
+                          className="w-20 p-1.5 text-center border border-slate-300 rounded-lg text-xs focus:ring-1 focus:ring-rose-500"
+                        />
+                      </td>
+                      <td className="p-2 text-center">
+                        <input
+                          type="number"
+                          min="0"
+                          value={leaveStats.absent?.times ?? 0}
                           onChange={(e) => setLeaveStats({ ...leaveStats, absent: { ...leaveStats.absent, times: Number(e.target.value) } })}
-                          className="w-20 p-1.5 text-center border border-slate-300 rounded-lg text-xs"
+                          className="w-20 p-1.5 text-center border border-slate-300 rounded-lg text-xs focus:ring-1 focus:ring-rose-500"
                         />
                       </td>
                       <td className="p-2 text-rose-600 font-semibold text-[11px]">ขาดงานเกินกำหนดมีผลต่องดจ้างต่อ</td>
+                    </tr>
+
+                    {/* 7. อื่น ๆ */}
+                    <tr className="hover:bg-slate-50/50">
+                      <td className="p-3 font-medium text-slate-900">7. อื่น ๆ</td>
+                      <td className="p-2 text-center">
+                        <input
+                          type="number"
+                          min="0"
+                          value={leaveStats.other?.days ?? 0}
+                          onChange={(e) => setLeaveStats({ ...leaveStats, other: { ...leaveStats.other, days: Number(e.target.value) } })}
+                          className="w-20 p-1.5 text-center border border-slate-300 rounded-lg text-xs focus:ring-1 focus:ring-blue-500"
+                        />
+                      </td>
+                      <td className="p-2 text-center">
+                        <input
+                          type="number"
+                          min="0"
+                          value={leaveStats.other?.times ?? 0}
+                          onChange={(e) => setLeaveStats({ ...leaveStats, other: { ...leaveStats.other, times: Number(e.target.value) } })}
+                          className="w-20 p-1.5 text-center border border-slate-300 rounded-lg text-xs focus:ring-1 focus:ring-blue-500"
+                        />
+                      </td>
+                      <td className="p-2 text-slate-500 italic text-[11px]">การลาประเภทอื่นๆ ที่ได้รับอนุมัติ</td>
                     </tr>
                   </tbody>
                 </table>

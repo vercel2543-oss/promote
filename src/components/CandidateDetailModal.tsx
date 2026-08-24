@@ -99,8 +99,8 @@ export const CandidateDetailModal: React.FC<CandidateDetailModalProps> = ({
                 {/* Candidate Info + Avatar */}
                 <div className="flex items-start sm:items-center gap-4">
                   <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-white/20 backdrop-blur-md border border-white/30 text-white flex items-center justify-center text-2xl font-bold shadow-inner shrink-0 overflow-hidden">
-                    {evaluatee.avatarUrl ? (
-                      <img src={evaluatee.avatarUrl} alt={evaluatee.name} className="w-full h-full object-cover" />
+                    {(evaluatee.avatar || evaluatee.avatarUrl) ? (
+                      <img src={evaluatee.avatar || evaluatee.avatarUrl} alt={evaluatee.name} className="w-full h-full object-cover" />
                     ) : (
                       evaluatee.name.charAt(0)
                     )}
@@ -242,6 +242,44 @@ export const CandidateDetailModal: React.FC<CandidateDetailModalProps> = ({
                   </div>
                 </div>
               </div>
+
+              {/* สถิติการมาทำงาน การลา และการมาสาย (7 รายการ) */}
+              {evaluatee.leaveStats && (
+                <div className="mt-4 p-4 rounded-2xl border border-slate-200/90 bg-slate-50/60 space-y-2.5">
+                  <div className="flex items-center justify-between text-xs font-bold text-slate-800">
+                    <div className="flex items-center gap-2">
+                      <div className="w-1 h-3 bg-indigo-600 rounded-full" />
+                      <Clock className="w-4 h-4 text-indigo-600" />
+                      <span>สถิติการมาทำงาน การลา และการมาสายในรอบการประเมิน (ข้อมูลจากผู้ดูแลระบบ)</span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2 text-center text-xs">
+                    {[
+                      { label: 'มาสาย', val: evaluatee.leaveStats.late, color: 'text-amber-700 bg-amber-50 border-amber-200' },
+                      { label: 'ลาป่วย', val: evaluatee.leaveStats.sick, color: 'text-rose-700 bg-rose-50 border-rose-200' },
+                      { label: 'ลากิจส่วนตัว', val: evaluatee.leaveStats.personal, color: 'text-blue-700 bg-blue-50 border-blue-200' },
+                      { label: 'ลาคลอดบุตร', val: evaluatee.leaveStats.maternity, color: 'text-purple-700 bg-purple-50 border-purple-200' },
+                      { label: 'ลาอุปสมบท/ฮัจย์', val: evaluatee.leaveStats.ordinationOrHajj, color: 'text-emerald-700 bg-emerald-50 border-emerald-200' },
+                      { label: 'ขาดราชการ', val: evaluatee.leaveStats.absent, color: 'text-red-700 bg-red-50 border-red-200' },
+                      { label: 'อื่นๆ', val: evaluatee.leaveStats.other, color: 'text-slate-700 bg-slate-100 border-slate-200' },
+                    ].map((st, i) => (
+                      <div key={i} className={`p-2 rounded-xl border ${st.color}`}>
+                        <div className="text-[10px] font-medium text-slate-500">{st.label}</div>
+                        <div className="text-xs font-bold mt-0.5">
+                          {st.val?.days || 0} วัน / {st.val?.times || 0} ครั้ง
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {evaluatee.leaveStats.notes && (
+                    <div className="text-[11px] text-slate-600 bg-white p-2.5 rounded-xl border border-slate-200">
+                      <span className="font-bold text-slate-700">หมายเหตุ:</span> {evaluatee.leaveStats.notes}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* SECTION 2: คณะกรรมการการนิเทศ & การให้คะแนน (Image 2) */}
@@ -278,9 +316,9 @@ export const CandidateDetailModal: React.FC<CandidateDetailModalProps> = ({
                           {/* Evaluator Avatar & Info */}
                           <div className="flex items-start gap-3">
                             <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center text-base font-bold shadow-2xs shrink-0 overflow-hidden">
-                              {evaluator.avatarUrl ? (
+                              {(evaluator.avatar || evaluator.avatarUrl) ? (
                                 <img
-                                  src={evaluator.avatarUrl}
+                                  src={evaluator.avatar || evaluator.avatarUrl}
                                   alt={evaluator.name}
                                   className="w-full h-full object-cover"
                                 />

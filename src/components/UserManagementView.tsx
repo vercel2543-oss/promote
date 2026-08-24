@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import {
   Users,
@@ -24,11 +24,243 @@ import {
   FileText,
   FileSpreadsheet,
   Check,
+  Camera,
+  Upload,
+  Image as ImageIcon,
+  Calendar,
+  Clock,
+  ClipboardList,
 } from 'lucide-react';
-import { User, UserRole, PositionGroup } from '../types';
+import { User, UserRole, PositionGroup, LeaveStats } from '../types';
 import { STANDARD_POSITIONS_13 } from '../data/formTemplates';
 import { TargetPositionGroupModal } from './TargetPositionGroupModal';
 import { getFormTemplateForUser } from '../utils/evaluationCalculator';
+
+const defaultLeaveStats: LeaveStats = {
+  late: { days: 0, times: 0 },
+  sick: { days: 0, times: 0 },
+  personal: { days: 0, times: 0 },
+  maternity: { days: 0, times: 0 },
+  ordinationOrHajj: { days: 0, times: 0 },
+  absent: { days: 0, times: 0 },
+  other: { days: 0, times: 0 },
+  notes: '',
+};
+
+interface AvatarPickerProps {
+  avatar: string;
+  onChange: (avatarUrl: string) => void;
+  role: UserRole;
+  name: string;
+}
+
+const AvatarPicker: React.FC<AvatarPickerProps> = ({ avatar, onChange, role, name }) => {
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) {
+        alert('ขนาดไฟล์รูปภาพต้องไม่เกิน 2MB');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result === 'string') {
+          onChange(reader.result);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  return (
+    <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3.5 flex flex-col sm:flex-row items-center gap-4">
+      <div className="relative shrink-0">
+        {avatar ? (
+          <img
+            src={avatar}
+            alt={name || 'Profile'}
+            className="w-16 h-16 rounded-2xl object-cover border-2 border-white shadow-sm ring-2 ring-blue-500/20"
+          />
+        ) : (
+          <div
+            className={`w-16 h-16 rounded-2xl flex items-center justify-center font-bold text-xl text-white shadow-sm ${
+              role === 'admin'
+                ? 'bg-purple-600'
+                : role === 'evaluator'
+                ? 'bg-blue-700'
+                : 'bg-emerald-600'
+            }`}
+          >
+            {name ? name.charAt(0) : <Camera className="w-6 h-6 text-white/80" />}
+          </div>
+        )}
+        {avatar && (
+          <button
+            type="button"
+            onClick={() => onChange('')}
+            className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-rose-500 hover:bg-rose-600 text-white rounded-full flex items-center justify-center text-xs shadow-xs transition"
+            title="ลบรูปภาพ"
+          >
+            ✕
+          </button>
+        )}
+      </div>
+
+      <div className="flex-1 text-center sm:text-left space-y-1">
+        <label className="block text-xs font-bold text-slate-800">
+          รูปประจำตัว / รูปโปรไฟล์ (Profile Picture)
+        </label>
+        <p className="text-[11px] text-slate-500">
+          สำหรับแสดงในรายชื่อคณะกรรมการผู้ประเมิน และผู้รับการประเมิน (ไฟล์ JPG, PNG ไม่เกิน 2MB)
+        </p>
+        <div className="flex items-center justify-center sm:justify-start gap-2 pt-1">
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            accept="image/png, image/jpeg, image/webp"
+            className="hidden"
+          />
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-xl shadow-2xs transition cursor-pointer"
+          >
+            <Upload className="w-3.5 h-3.5 text-blue-600" />
+            <span>{avatar ? 'เปลี่ยนรูปภาพ' : 'อัปโหลดรูปภาพ'}</span>
+          </button>
+          {avatar && (
+            <button
+              type="button"
+              onClick={() => onChange('')}
+              className="text-xs font-semibold text-rose-600 hover:text-rose-700 px-2 py-1 transition cursor-pointer"
+            >
+              ลบรูป
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+interface LeaveStatsEditorProps {
+  leaveStats: LeaveStats;
+  onChange: (stats: LeaveStats) => void;
+  candidateName?: string;
+}
+
+const LeaveStatsEditor: React.FC<LeaveStatsEditorProps> = ({ leaveStats, onChange, candidateName }) => {
+  const updateCategory = (
+    key: keyof Omit<LeaveStats, 'notes' | 'sickAndPersonal'>,
+    field: 'days' | 'times',
+    value: number
+  ) => {
+    const safeVal = Math.max(0, isNaN(value) ? 0 : value);
+    onChange({
+      ...leaveStats,
+      [key]: {
+        ...(leaveStats[key] || { days: 0, times: 0 }),
+        [field]: safeVal,
+      },
+    });
+  };
+
+  const categories = [
+    { key: 'late', label: '1. มาสาย', color: 'text-amber-700 bg-amber-50 border-amber-200' },
+    { key: 'sick', label: '2. ลาป่วย', color: 'text-blue-700 bg-blue-50 border-blue-200' },
+    { key: 'personal', label: '3. ลากิจส่วนตัว', color: 'text-indigo-700 bg-indigo-50 border-indigo-200' },
+    { key: 'maternity', label: '4. ลาคลอดบุตร', color: 'text-purple-700 bg-purple-50 border-purple-200' },
+    { key: 'ordinationOrHajj', label: '5. ลาอุปสมบท / พิธีฮัจย์', color: 'text-emerald-700 bg-emerald-50 border-emerald-200' },
+    { key: 'absent', label: '6. ขาดราชการ', color: 'text-rose-700 bg-rose-50 border-rose-200' },
+    { key: 'other', label: '7. อื่น ๆ', color: 'text-slate-700 bg-slate-100 border-slate-200' },
+  ] as const;
+
+  const totalDays = categories.reduce((sum, c) => sum + (leaveStats[c.key]?.days || 0), 0);
+  const totalTimes = categories.reduce((sum, c) => sum + (leaveStats[c.key]?.times || 0), 0);
+
+  return (
+    <div className="bg-emerald-50/60 border-2 border-emerald-200/90 rounded-2xl p-4 space-y-3 shadow-xs">
+      <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-emerald-200/60">
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-lg bg-emerald-600 text-white flex items-center justify-center">
+            <Clock className="w-4 h-4" />
+          </div>
+          <div>
+            <h4 className="text-xs sm:text-sm font-bold text-emerald-950">
+              สถิติการมาทำงาน การลา และการมาสาย (ข้อมูลจากแอดมิน)
+            </h4>
+            <p className="text-[11px] text-emerald-800/80">
+              บันทึกล่วงหน้าเพื่อดึงเข้าสู่แบบประเมินของกรรมการโดยอัตโนมัติ
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 text-xs font-bold bg-white px-2.5 py-1 rounded-xl border border-emerald-200 shadow-2xs">
+          <span className="text-slate-600">รวมทั้งหมด:</span>
+          <span className="text-emerald-700">{totalDays} วัน</span>
+          <span className="text-slate-300">/</span>
+          <span className="text-blue-700">{totalTimes} ครั้ง</span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+        {categories.map((cat) => {
+          const item = leaveStats[cat.key] || { days: 0, times: 0 };
+          return (
+            <div
+              key={cat.key}
+              className="bg-white p-2.5 rounded-xl border border-slate-200/90 flex items-center justify-between gap-2 shadow-2xs"
+            >
+              <span className="font-semibold text-slate-800 truncate">{cat.label}</span>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <div className="flex items-center gap-1">
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.5"
+                    value={item.days === 0 ? '' : item.days}
+                    onChange={(e) => updateCategory(cat.key, 'days', parseFloat(e.target.value))}
+                    placeholder="0"
+                    className="w-12 px-1.5 py-1 text-center font-bold text-slate-900 border border-slate-300 rounded-lg focus:border-emerald-600 focus:ring-1 focus:ring-emerald-500 outline-none"
+                  />
+                  <span className="text-[11px] text-slate-500">วัน</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={item.times === 0 ? '' : item.times}
+                    onChange={(e) => updateCategory(cat.key, 'times', parseInt(e.target.value, 10))}
+                    placeholder="0"
+                    className="w-12 px-1.5 py-1 text-center font-bold text-slate-900 border border-slate-300 rounded-lg focus:border-emerald-600 focus:ring-1 focus:ring-emerald-500 outline-none"
+                  />
+                  <span className="text-[11px] text-slate-500">ครั้ง</span>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div>
+        <label className="block text-[11px] font-bold text-slate-700 mb-1">
+          หมายเหตุเพิ่มเติมเกี่ยวกับสถิติวันลา
+        </label>
+        <input
+          type="text"
+          value={leaveStats.notes || ''}
+          onChange={(e) => onChange({ ...leaveStats, notes: e.target.value })}
+          placeholder="เช่น มีใบรับรองแพทย์ครบถ้วน, ลากิจไปราชการ"
+          className="w-full px-3 py-1.5 text-xs border border-slate-300 rounded-xl bg-white focus:border-emerald-600 outline-none"
+        />
+      </div>
+    </div>
+  );
+};
 
 export const UserManagementView: React.FC = () => {
   const {
@@ -68,6 +300,8 @@ export const UserManagementView: React.FC = () => {
     phone: '',
     employeeCode: '',
     formTemplateId: 'form_support_laborer',
+    avatar: '',
+    leaveStats: defaultLeaveStats,
   });
 
   const resetForm = () => {
@@ -84,6 +318,8 @@ export const UserManagementView: React.FC = () => {
       phone: '',
       employeeCode: '',
       formTemplateId: defaultForm,
+      avatar: '',
+      leaveStats: defaultLeaveStats,
     });
   };
 
@@ -107,7 +343,38 @@ export const UserManagementView: React.FC = () => {
       phone: user.phone || '',
       employeeCode: user.employeeCode || '',
       formTemplateId: user.formTemplateId || defaultForm.id,
+      avatar: user.avatar || '',
+      leaveStats: user.leaveStats
+        ? {
+            late: user.leaveStats.late || { days: 0, times: 0 },
+            sick: user.leaveStats.sick || user.leaveStats.sickAndPersonal || { days: 0, times: 0 },
+            personal: user.leaveStats.personal || { days: 0, times: 0 },
+            maternity: user.leaveStats.maternity || { days: 0, times: 0 },
+            ordinationOrHajj: user.leaveStats.ordinationOrHajj || { days: 0, times: 0 },
+            absent: user.leaveStats.absent || { days: 0, times: 0 },
+            other: user.leaveStats.other || { days: 0, times: 0 },
+            notes: user.leaveStats.notes || '',
+          }
+        : defaultLeaveStats,
     });
+  };
+
+  // Image Upload helper (converts to base64 Data URL)
+  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) {
+        alert('ขนาดไฟล์รูปภาพต้องไม่เกิน 2MB');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result === 'string') {
+          setFormData((prev) => ({ ...prev, avatar: reader.result as string }));
+        }
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const handleSaveAddUser = (e: React.FormEvent) => {
@@ -125,6 +392,8 @@ export const UserManagementView: React.FC = () => {
       email: formData.email || `${formData.username || 'user'}@school.ac.th`,
       phone: formData.phone,
       employeeCode: formData.employeeCode,
+      avatar: formData.avatar || undefined,
+      leaveStats: formData.role === 'staff' ? formData.leaveStats : undefined,
       formTemplateId: formData.role === 'staff' ? formData.formTemplateId : undefined,
     });
 
@@ -148,6 +417,8 @@ export const UserManagementView: React.FC = () => {
       email: formData.email,
       phone: formData.phone,
       employeeCode: formData.employeeCode,
+      avatar: formData.avatar || undefined,
+      leaveStats: formData.role === 'staff' ? formData.leaveStats : undefined,
       formTemplateId: formData.role === 'staff' ? formData.formTemplateId : undefined,
     });
 
@@ -368,17 +639,25 @@ export const UserManagementView: React.FC = () => {
                 {/* Card Top */}
                 <div className="flex items-start justify-between gap-2 mb-3">
                   <div className="flex items-center gap-3">
-                    <div
-                      className={`w-11 h-11 rounded-xl flex items-center justify-center font-bold text-base text-white shadow-xs ${
-                        user.role === 'admin'
-                          ? 'bg-purple-600'
-                          : user.role === 'evaluator'
-                          ? 'bg-blue-700'
-                          : 'bg-emerald-600'
-                      }`}
-                    >
-                      {user.name.charAt(0)}
-                    </div>
+                    {user.avatar ? (
+                      <img
+                        src={user.avatar}
+                        alt={user.name}
+                        className="w-11 h-11 rounded-xl object-cover shadow-xs border border-slate-200 shrink-0"
+                      />
+                    ) : (
+                      <div
+                        className={`w-11 h-11 rounded-xl flex items-center justify-center font-bold text-base text-white shadow-xs shrink-0 ${
+                          user.role === 'admin'
+                            ? 'bg-purple-600'
+                            : user.role === 'evaluator'
+                            ? 'bg-blue-700'
+                            : 'bg-emerald-600'
+                        }`}
+                      >
+                        {user.name.charAt(0)}
+                      </div>
+                    )}
                     <div>
                       <div className="flex items-center gap-1.5">
                         <h4 className="text-sm font-bold text-slate-900 leading-snug">
@@ -416,15 +695,52 @@ export const UserManagementView: React.FC = () => {
 
                   {user.role === 'staff' && (() => {
                     const assignedForm = getFormTemplateForUser(user, formTemplates);
+                    const ls = user.leaveStats;
+                    const hasLeaveData = ls && (
+                      (ls.late?.days || 0) > 0 || (ls.late?.times || 0) > 0 ||
+                      (ls.sick?.days || 0) > 0 || (ls.sick?.times || 0) > 0 ||
+                      (ls.personal?.days || 0) > 0 || (ls.personal?.times || 0) > 0 ||
+                      (ls.maternity?.days || 0) > 0 || (ls.maternity?.times || 0) > 0 ||
+                      (ls.ordinationOrHajj?.days || 0) > 0 || (ls.ordinationOrHajj?.times || 0) > 0 ||
+                      (ls.absent?.days || 0) > 0 || (ls.absent?.times || 0) > 0 ||
+                      (ls.other?.days || 0) > 0 || (ls.other?.times || 0) > 0 ||
+                      (ls.notes && ls.notes.trim().length > 0)
+                    );
+                    const totalDays = (ls?.late?.days || 0) + (ls?.sick?.days || 0) + (ls?.personal?.days || 0) +
+                      (ls?.maternity?.days || 0) + (ls?.ordinationOrHajj?.days || 0) + (ls?.absent?.days || 0) + (ls?.other?.days || 0);
+                    const totalTimes = (ls?.late?.times || 0) + (ls?.sick?.times || 0) + (ls?.personal?.times || 0) +
+                      (ls?.maternity?.times || 0) + (ls?.ordinationOrHajj?.times || 0) + (ls?.absent?.times || 0) + (ls?.other?.times || 0);
+
                     return (
-                      <div className="mt-2 pt-2 border-t border-slate-200/60 flex items-center justify-between gap-1.5 text-[11px] text-indigo-700 bg-indigo-50/60 px-2.5 py-1.5 rounded-lg border border-indigo-100/80">
-                        <div className="flex items-center gap-1.5 truncate">
-                          <FileSpreadsheet className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-                          <span className="font-semibold truncate">แบบประเมิน: [{assignedForm.code}] {assignedForm.positionTitle}</span>
+                      <div className="space-y-1.5 mt-2">
+                        <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between gap-1.5 text-[11px] text-indigo-700 bg-indigo-50/60 px-2.5 py-1.5 rounded-lg border border-indigo-100/80">
+                          <div className="flex items-center gap-1.5 truncate">
+                            <FileSpreadsheet className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                            <span className="font-semibold truncate">แบบประเมิน: [{assignedForm.code}] {assignedForm.positionTitle}</span>
+                          </div>
+                          <span className="text-[10px] bg-white text-indigo-800 font-bold px-1.5 py-0.5 rounded shadow-2xs shrink-0">
+                            {assignedForm.totalMaxScore} คะแนน
+                          </span>
                         </div>
-                        <span className="text-[10px] bg-white text-indigo-800 font-bold px-1.5 py-0.5 rounded shadow-2xs shrink-0">
-                          {assignedForm.totalMaxScore} คะแนน
-                        </span>
+
+                        {hasLeaveData ? (
+                          <div className="flex items-center justify-between text-[10.5px] bg-emerald-50 text-emerald-800 px-2.5 py-1 rounded-lg border border-emerald-200/70 font-medium">
+                            <span className="flex items-center gap-1">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
+                              <span>สถิติวันลา: แอดมินบันทึกแล้ว</span>
+                            </span>
+                            <span className="font-bold text-emerald-900">
+                              {totalDays} วัน / {totalTimes} ครั้ง
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-between text-[10.5px] text-slate-400 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200/60">
+                            <span className="flex items-center gap-1">
+                              <Clock className="w-3 h-3 text-slate-400 shrink-0" />
+                              <span>สถิติวันลา: ยังไม่ได้กรอกล่วงหน้า</span>
+                            </span>
+                          </div>
+                        )}
                       </div>
                     );
                   })()}
@@ -499,6 +815,14 @@ export const UserManagementView: React.FC = () => {
             </div>
 
             <form onSubmit={handleSaveAddUser} className="mt-4 space-y-4">
+              {/* Profile Image Picker */}
+              <AvatarPicker
+                avatar={formData.avatar}
+                onChange={(avatar) => setFormData({ ...formData, avatar })}
+                role={formData.role}
+                name={formData.name}
+              />
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">
@@ -754,6 +1078,15 @@ export const UserManagementView: React.FC = () => {
                 </div>
               </div>
 
+              {/* Leave Statistics Pre-fill (for staff) */}
+              {formData.role === 'staff' && (
+                <LeaveStatsEditor
+                  leaveStats={formData.leaveStats}
+                  onChange={(leaveStats) => setFormData({ ...formData, leaveStats })}
+                  candidateName={formData.name}
+                />
+              )}
+
               <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-end gap-2">
                 <button
                   type="button"
@@ -794,6 +1127,14 @@ export const UserManagementView: React.FC = () => {
             </div>
 
             <form onSubmit={handleSaveEditUser} className="mt-4 space-y-4">
+              {/* Profile Image Picker */}
+              <AvatarPicker
+                avatar={formData.avatar}
+                onChange={(avatar) => setFormData({ ...formData, avatar })}
+                role={formData.role}
+                name={formData.name}
+              />
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">
@@ -1017,6 +1358,15 @@ export const UserManagementView: React.FC = () => {
                   />
                 </div>
               </div>
+
+              {/* Leave Statistics Pre-fill (for staff) */}
+              {formData.role === 'staff' && (
+                <LeaveStatsEditor
+                  leaveStats={formData.leaveStats}
+                  onChange={(leaveStats) => setFormData({ ...formData, leaveStats })}
+                  candidateName={formData.name}
+                />
+              )}
 
               <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-end gap-2">
                 <button
